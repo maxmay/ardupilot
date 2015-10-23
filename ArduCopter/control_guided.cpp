@@ -11,6 +11,7 @@
 #endif
 
 #define GUIDED_POSVEL_TIMEOUT_MS    3000    // guided mode's position-velocity controller times out after 3seconds with no new updates
+#define GUIDED_ATTITUDE_TIMEOUT_MS  1000    // guided mode's attitude controller times out after 1 second with no new updates
 
 static Vector3f posvel_pos_target_cm;
 static Vector3f posvel_vel_target_cms;
@@ -247,6 +248,18 @@ void Copter::guided_run()
 //      called by guided_run at 100hz or more
 void Copter::guided_takeoff_run()
 {
+    // if not auto armed or motors not enabled set throttle to zero and exit immediately
+    if (!ap.auto_armed || !motors.get_interlock()) {
+#if FRAME_CONFIG == HELI_FRAME  // Helicopters always stabilize roll/pitch/yaw
+        // call attitude controller
+        attitude_control.angle_ef_roll_pitch_rate_ef_yaw_smooth(0, 0, 0, get_smoothing_gain());
+        attitude_control.set_throttle_out(0,false,g.throttle_filt);
+#else   // multicopters do not stabilize roll/pitch/yaw when disarmed
+        attitude_control.set_throttle_out_unstabilized(0,true,g.throttle_filt);
+#endif
+        return;
+    }
+
     // process pilot's yaw input
     float target_yaw_rate = 0;
     if (!failsafe.radio) {
@@ -470,7 +483,7 @@ void Copter::guided_angle_control_run()
 
     // check for timeout - set lean angles and climb rate to zero if no updates received for 3 seconds
     uint32_t tnow = millis();
-    if (tnow - guided_angle_state.update_time_ms > GUIDED_POSVEL_TIMEOUT_MS) {
+    if (tnow - guided_angle_state.update_time_ms > GUIDED_ATTITUDE_TIMEOUT_MS) {
         roll_in = 0.0f;
         pitch_in = 0.0f;
         climb_rate_cms = 0.0f;
