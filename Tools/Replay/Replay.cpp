@@ -33,7 +33,6 @@
 #include <GCS_MAVLink/GCS_MAVLink.h>
 #include <AP_GPS/AP_GPS.h>
 #include <AP_AHRS/AP_AHRS.h>
-#include <SITL/SITL.h>
 #include <AP_Compass/AP_Compass.h>
 #include <AP_Baro/AP_Baro.h>
 #include <AP_InertialSensor/AP_InertialSensor.h>
@@ -65,6 +64,10 @@
 
 #include "LogReader.h"
 #include "DataFlashFileReader.h"
+
+#if CONFIG_HAL_BOARD == HAL_BOARD_SITL
+#include <SITL/SITL.h>
+#endif
 
 #define streq(x, y) (!strcmp(x, y))
 
@@ -230,7 +233,7 @@ private:
     ReplayVehicle &_vehicle;
 
 #if CONFIG_HAL_BOARD == HAL_BOARD_SITL
-    SITL sitl;
+    SITL::SITL sitl;
 #endif
 
     LogReader logreader{_vehicle.ahrs, _vehicle.ins, _vehicle.barometer, _vehicle.compass, _vehicle.gps, _vehicle.airspeed, _vehicle.dataflash, log_structure, ARRAY_SIZE(log_structure), nottypes};
@@ -277,6 +280,7 @@ private:
     } user_parameters[100];
 
     void set_ins_update_rate(uint16_t update_rate);
+    void inhibit_gyro_cal();
 
     void usage(void);
     void set_user_parameters(void);
@@ -605,6 +609,7 @@ void Replay::setup()
 
     _vehicle.setup();
 
+    inhibit_gyro_cal();
     set_ins_update_rate(log_info.update_rate);
 
     feenableexcept(FE_INVALID | FE_OVERFLOW);
@@ -645,6 +650,19 @@ void Replay::set_ins_update_rate(uint16_t _update_rate) {
     }
 }
 
+void Replay::inhibit_gyro_cal() {
+    // swiped from LR_MsgHandler.cpp; until we see PARM messages, we
+    // don't have a PARM handler available to set parameters.
+    enum ap_var_type var_type;
+    AP_Param *vp = AP_Param::find("INS_GYR_CAL", &var_type);
+    if (vp == NULL) {
+        ::fprintf(stderr, "No GYR_CAL parameter found\n");
+        abort();
+    }
+    ((AP_Float *)vp)->set(AP_InertialSensor::GYRO_CAL_NEVER);
+
+    // logreader.set_parameter("GYR_CAL", AP_InertialSensor::GYRO_CAL_NEVER);
+}
 
 /*
   setup user -p parameters
