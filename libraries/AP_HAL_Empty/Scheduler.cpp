@@ -10,27 +10,11 @@ extern const AP_HAL::HAL& hal;
 EmptyScheduler::EmptyScheduler()
 {}
 
-void EmptyScheduler::init(void* machtnichts)
+void EmptyScheduler::init()
 {}
 
 void EmptyScheduler::delay(uint16_t ms)
 {}
-
-uint64_t EmptyScheduler::millis64() {
-    return 10000;
-}
-
-uint64_t EmptyScheduler::micros64() {
-    return 200000;
-}
-
-uint32_t EmptyScheduler::millis() {
-    return millis64();
-}
-
-uint32_t EmptyScheduler::micros() {
-    return micros64();
-}
 
 void EmptyScheduler::delay_microseconds(uint16_t us)
 {}
@@ -70,18 +54,6 @@ bool EmptyScheduler::system_initializing() {
 
 void EmptyScheduler::system_initialized()
 {}
-
-void EmptyScheduler::panic(const prog_char_t *errormsg, ...)
-{
-    va_list ap;
-
-    va_start(ap, errormsg);
-    hal.console->vprintf_P(errormsg, ap);
-    va_end(ap);
-    hal.console->printf_P("\n");
-
-    for(;;);
-}
 
 void EmptyScheduler::reboot(bool hold_in_bootloader) {
     for(;;);

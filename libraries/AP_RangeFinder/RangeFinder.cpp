@@ -25,7 +25,7 @@
 #include "AP_RangeFinder_LightWareSerial.h"
 
 // table of user settable parameters
-const AP_Param::GroupInfo RangeFinder::var_info[] PROGMEM = {
+const AP_Param::GroupInfo RangeFinder::var_info[] = {
     // @Param: _TYPE
     // @DisplayName: Rangefinder type
     // @Description: What type of rangefinder device that is connected
@@ -596,14 +596,14 @@ void RangeFinder::update_pre_arm_check(uint8_t instance)
     }
 
     // update min, max captured distances
-    state[instance].pre_arm_distance_min = min(state[instance].distance_cm, state[instance].pre_arm_distance_min);
-    state[instance].pre_arm_distance_max = max(state[instance].distance_cm, state[instance].pre_arm_distance_max);
+    state[instance].pre_arm_distance_min = MIN(state[instance].distance_cm, state[instance].pre_arm_distance_min);
+    state[instance].pre_arm_distance_max = MAX(state[instance].distance_cm, state[instance].pre_arm_distance_max);
 
     // Check that the range finder has been exercised through a realistic range of movement
     if (((state[instance].pre_arm_distance_max - state[instance].pre_arm_distance_min) > RANGEFINDER_PREARM_REQUIRED_CHANGE_CM) &&
          (state[instance].pre_arm_distance_max < RANGEFINDER_PREARM_ALT_MAX_CM) &&
-         ((int16_t)state[instance].pre_arm_distance_min < (max(_ground_clearance_cm[instance],min_distance_cm(instance)) + 10)) &&
-         ((int16_t)state[instance].pre_arm_distance_min > (min(_ground_clearance_cm[instance],min_distance_cm(instance)) - 10))) {
+         ((int16_t)state[instance].pre_arm_distance_min < (MAX(_ground_clearance_cm[instance],min_distance_cm(instance)) + 10)) &&
+         ((int16_t)state[instance].pre_arm_distance_min > (MIN(_ground_clearance_cm[instance],min_distance_cm(instance)) - 10))) {
         state[instance].pre_arm_check = true;
     }
 }

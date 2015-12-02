@@ -4,7 +4,7 @@
 
 extern const AP_HAL::HAL& hal;
 
-const AP_Param::GroupInfo AC_WPNav::var_info[] PROGMEM = {
+const AP_Param::GroupInfo AC_WPNav::var_info[] = {
     // index 0 was used for the old orientation matrix
 
     // @Param: SPEED
@@ -74,7 +74,7 @@ const AP_Param::GroupInfo AC_WPNav::var_info[] PROGMEM = {
     // @DisplayName: Loiter maximum jerk
     // @Description: Loiter maximum jerk in cm/s/s/s
     // @Units: cm/s/s/s
-    // @Range: 500 2000
+    // @Range: 500 5000
     // @Increment: 1
     // @User: Advanced
     AP_GROUPINFO("LOIT_JERK",   7, AC_WPNav, _loiter_jerk_max_cmsss, WPNAV_LOITER_JERK_MAX_DEFAULT),
@@ -112,6 +112,7 @@ AC_WPNav::AC_WPNav(const AP_InertialNav& inav, const AP_AHRS& ahrs, AC_PosContro
     _loiter_step(0),
     _pilot_accel_fwd_cms(0),
     _pilot_accel_rgt_cms(0),
+    _loiter_ekf_pos_reset_ms(0),
     _wp_last_update(0),
     _wp_step(0),
     _track_length(0.0f),
@@ -147,9 +148,10 @@ void AC_WPNav::init_loiter_target(const Vector3f& position, bool reset_I)
     // initialise position controller
     _pos_control.init_xy_controller(reset_I);
 
-    // initialise pos controller speed and acceleration
+    // initialise pos controller speed, acceleration and jerk
     _pos_control.set_speed_xy(_loiter_speed_cms);
     _pos_control.set_accel_xy(_loiter_accel_cmss);
+    _pos_control.set_jerk_xy(_loiter_jerk_max_cmsss);
 
     // set target position
     _pos_control.set_xy_target(position.x, position.y);
@@ -170,15 +172,8 @@ void AC_WPNav::init_loiter_target(const Vector3f& position, bool reset_I)
 ///     used by precision landing to adjust horizontal position target
 void AC_WPNav::shift_loiter_target(const Vector3f &pos_adjustment)
 {
-    Vector3f new_target = _pos_control.get_pos_target() + pos_adjustment;
-
     // move pos controller target
-    _pos_control.set_xy_target(new_target.x, new_target.y);
-
-    // disable feed forward
-    if (fabsf(pos_adjustment.x) > 0.0f || fabsf(pos_adjustment.y) > 0.0f) {
-        _pos_control.freeze_ff_xy();
-    }
+    _pos_control.shift_pos_xy_target(pos_adjustment.x, pos_adjustment.y);
 }
 
 /// init_loiter_target - initialize's loiter position and feed-forward velocity from current pos and velocity
@@ -187,12 +182,16 @@ void AC_WPNav::init_loiter_target()
     const Vector3f& curr_pos = _inav.get_position();
     const Vector3f& curr_vel = _inav.get_velocity();
 
+    // initialise ekf position reset check
+    init_ekf_position_reset();
+
     // initialise position controller
     _pos_control.init_xy_controller();
 
     // initialise pos controller speed and acceleration
     _pos_control.set_speed_xy(_loiter_speed_cms);
     _pos_control.set_accel_xy(_loiter_accel_cmss);
+    _pos_control.set_jerk_xy(_loiter_jerk_max_cmsss);
 
     // set target position
     _pos_control.set_xy_target(curr_pos.x, curr_pos.y);
@@ -239,8 +238,8 @@ void AC_WPNav::calc_loiter_desired_velocity(float nav_dt, float ekfGndSpdLimit)
 {
     // calculate a loiter speed limit which is the minimum of the value set by the WPNAV_LOITER_SPEED
     // parameter and the value set by the EKF to observe optical flow limits
-    float gnd_speed_limit_cms = min(_loiter_speed_cms,ekfGndSpdLimit*100.0f);
-    gnd_speed_limit_cms = max(gnd_speed_limit_cms, 10.0f);
+    float gnd_speed_limit_cms = MIN(_loiter_speed_cms,ekfGndSpdLimit*100.0f);
+    gnd_speed_limit_cms = MAX(gnd_speed_limit_cms, 10.0f);
 
     // range check nav_dt
     if( nav_dt < 0 ) {
@@ -254,6 +253,7 @@ void AC_WPNav::calc_loiter_desired_velocity(float nav_dt, float ekfGndSpdLimit)
 
     _pos_control.set_speed_xy(gnd_speed_limit_cms);
     _pos_control.set_accel_xy(_loiter_accel_cmss);
+    _pos_control.set_jerk_xy(_loiter_jerk_max_cmsss);
 
     // rotate pilot input to lat/lon frame
     Vector2f desired_accel;
@@ -290,10 +290,10 @@ void AC_WPNav::calc_loiter_desired_velocity(float nav_dt, float ekfGndSpdLimit)
         float drag_speed_delta = -_loiter_accel_cmss*nav_dt*desired_speed/gnd_speed_limit_cms;
 
         if (_pilot_accel_fwd_cms == 0 && _pilot_accel_rgt_cms == 0) {
-            drag_speed_delta = min(drag_speed_delta,-_loiter_accel_min_cmss*nav_dt);
+            drag_speed_delta = MIN(drag_speed_delta,MAX(-_loiter_accel_min_cmss*nav_dt, -2.0f*desired_speed*nav_dt));
         }
 
-        desired_speed = max(desired_speed+drag_speed_delta,0.0f);
+        desired_speed = MAX(desired_speed+drag_speed_delta,0.0f);
         desired_vel = desired_vel_norm*desired_speed;
     }
 
@@ -327,6 +327,14 @@ void AC_WPNav::update_loiter(float ekfGndSpdLimit, float ekfNavVelGainScaler)
         if (dt >= 0.2f) {
             dt = 0.0f;
         }
+        // initialise ekf position reset check
+        check_for_ekf_position_reset();
+
+        // initialise pos controller speed and acceleration
+        _pos_control.set_speed_xy(_loiter_speed_cms);
+        _pos_control.set_accel_xy(_loiter_accel_cmss);
+        _pos_control.set_jerk_xy(_loiter_jerk_max_cmsss);
+
         calc_loiter_desired_velocity(dt,ekfGndSpdLimit);
         _pos_control.update_xy_controller(AC_PosControl::XY_MODE_POS_LIMITED_AND_VEL_FF, ekfNavVelGainScaler, true);
     }
@@ -338,12 +346,16 @@ void AC_WPNav::init_brake_target(float accel_cmss)
     const Vector3f& curr_vel = _inav.get_velocity();
     Vector3f stopping_point;
 
+    // initialise ekf position reset check
+    init_ekf_position_reset();
+
     // initialise position controller
     _pos_control.init_xy_controller();
 
     // initialise pos controller speed and acceleration
     _pos_control.set_speed_xy(curr_vel.length());
     _pos_control.set_accel_xy(accel_cmss);
+    _pos_control.set_jerk_xy(_loiter_jerk_max_cmsss);
     _pos_control.calc_leash_length_xy();
 
     _pos_control.get_stopping_point_xy(stopping_point);
@@ -387,6 +399,7 @@ void AC_WPNav::wp_and_spline_init()
     // initialise position controller speed and acceleration
     _pos_control.set_speed_xy(_wp_speed_cms);
     _pos_control.set_accel_xy(_wp_accel_cms);
+    _pos_control.set_jerk_xy_to_default();
     _pos_control.set_speed_z(-_wp_speed_down_cms, _wp_speed_up_cms);
     _pos_control.set_accel_z(_wp_accel_z_cms);
     _pos_control.calc_leash_length_xy();
@@ -411,7 +424,7 @@ void AC_WPNav::set_wp_destination(const Vector3f& destination)
 	Vector3f origin;
 
     // if waypoint controller is active use the existing position target as the origin
-    if ((hal.scheduler->millis() - _wp_last_update) < 1000) {
+    if ((AP_HAL::millis() - _wp_last_update) < 1000) {
         origin = _pos_control.get_pos_target();
     } else {
         // if waypoint controller is not active, set origin to reasonable stopping point (using curr pos and velocity)
@@ -538,7 +551,7 @@ void AC_WPNav::advance_wp_target_along_track(float dt)
     }
 
     // calculate how far along the track we could move the intermediate target before reaching the end of the leash
-    track_leash_slack = min(_track_leash_length*(leash_z-track_error_z)/leash_z, _track_leash_length*(leash_xy-track_error_xy)/leash_xy);
+    track_leash_slack = MIN(_track_leash_length*(leash_z-track_error_z)/leash_z, _track_leash_length*(leash_xy-track_error_xy)/leash_xy);
     if (track_leash_slack < 0) {
         track_desired_max = track_covered;
     }else{
@@ -582,7 +595,7 @@ void AC_WPNav::advance_wp_target_along_track(float dt)
             }
             // if target is slowing down, limit the speed
             if (_flags.slowing_down) {
-                _limited_speed_xy_cms = min(_limited_speed_xy_cms, get_slow_down_speed(dist_to_dest, _track_accel));
+                _limited_speed_xy_cms = MIN(_limited_speed_xy_cms, get_slow_down_speed(dist_to_dest, _track_accel));
             }
         }
 
@@ -657,6 +670,7 @@ void AC_WPNav::update_wpnav()
         // allow the accel and speed values to be set without changing
         // out of auto mode. This makes it easier to tune auto flight
         _pos_control.set_accel_xy(_wp_accel_cms);
+        _pos_control.set_jerk_xy_to_default();
         _pos_control.set_accel_z(_wp_accel_z_cms);
     
         // sanity check dt
@@ -678,7 +692,7 @@ void AC_WPNav::update_wpnav()
         _pos_control.update_xy_controller(AC_PosControl::XY_MODE_POS_ONLY, 1.0f, false);
         check_wp_leash_length();
 
-        _wp_last_update = hal.scheduler->millis();
+        _wp_last_update = AP_HAL::millis();
     }
 }
 
@@ -723,9 +737,9 @@ void AC_WPNav::calculate_wp_leash_length()
         _track_speed = speed_z/pos_delta_unit_z;
         _track_leash_length = leash_z/pos_delta_unit_z;
     }else{
-        _track_accel = min(_wp_accel_z_cms/pos_delta_unit_z, _wp_accel_cms/pos_delta_unit_xy);
-        _track_speed = min(speed_z/pos_delta_unit_z, _wp_speed_cms/pos_delta_unit_xy);
-        _track_leash_length = min(leash_z/pos_delta_unit_z, _pos_control.get_leash_xy()/pos_delta_unit_xy);
+        _track_accel = MIN(_wp_accel_z_cms/pos_delta_unit_z, _wp_accel_cms/pos_delta_unit_xy);
+        _track_speed = MIN(speed_z/pos_delta_unit_z, _wp_speed_cms/pos_delta_unit_xy);
+        _track_leash_length = MIN(leash_z/pos_delta_unit_z, _pos_control.get_leash_xy()/pos_delta_unit_xy);
     }
 
     // calculate slow down distance (the distance from the destination when the target point should begin to slow down)
@@ -748,7 +762,7 @@ void AC_WPNav::set_spline_destination(const Vector3f& destination, bool stopped_
     Vector3f origin;
 
     // if waypoint controller is active and copter has reached the previous waypoint use current pos target as the origin
-    if ((hal.scheduler->millis() - _wp_last_update) < 1000) {
+    if ((AP_HAL::millis() - _wp_last_update) < 1000) {
         origin = _pos_control.get_pos_target();
     }else{
         // otherwise calculate origin from the current position and velocity
@@ -765,7 +779,7 @@ void AC_WPNav::set_spline_destination(const Vector3f& destination, bool stopped_
 void AC_WPNav::set_spline_origin_and_destination(const Vector3f& origin, const Vector3f& destination, bool stopped_at_start, spline_segment_end_type seg_end_type, const Vector3f& next_destination)
 {
     // mission is "active" if wpnav has been called recently and vehicle reached the previous waypoint
-    bool prev_segment_exists = (_flags.reached_destination && ((hal.scheduler->millis() - _wp_last_update) < 1000));
+    bool prev_segment_exists = (_flags.reached_destination && ((AP_HAL::millis() - _wp_last_update) < 1000));
     float dt = _pos_control.get_dt_xy();
 
     // check _wp_accel_cms is reasonable to avoid divide by zero
@@ -892,7 +906,7 @@ void AC_WPNav::update_spline()
         // run horizontal position controller
         _pos_control.update_xy_controller(AC_PosControl::XY_MODE_POS_ONLY, 1.0f, false);
 
-        _wp_last_update = hal.scheduler->millis();
+        _wp_last_update = AP_HAL::millis();
     }
 }
 
@@ -938,7 +952,7 @@ void AC_WPNav::advance_spline_target_along_track(float dt)
         }
 
         // calculate how far along the track we could move the intermediate target before reaching the end of the leash
-        float track_leash_slack = min(_track_leash_length*(leash_z-track_error_z)/leash_z, _track_leash_length*(leash_xy-track_error_xy)/leash_xy);
+        float track_leash_slack = MIN(_track_leash_length*(leash_z-track_error_z)/leash_z, _track_leash_length*(leash_xy-track_error_xy)/leash_xy);
         if (track_leash_slack < 0.0f) {
             track_leash_slack = 0.0f;
         }
@@ -947,7 +961,7 @@ void AC_WPNav::advance_spline_target_along_track(float dt)
         float spline_dist_to_wp = (_destination - target_pos).length();
         float vel_limit = _wp_speed_cms;
         if (!is_zero(dt)) {
-            vel_limit = min(vel_limit, track_leash_slack/dt);
+            vel_limit = MIN(vel_limit, track_leash_slack/dt);
         }
 
         // if within the stopping distance from destination, set target velocity to sqrt of distance * 2 * acceleration
@@ -1046,5 +1060,24 @@ float AC_WPNav::get_slow_down_speed(float dist_from_dest_cm, float accel_cmss)
         return WPNAV_WP_TRACK_SPEED_MIN;
     } else {
         return target_speed;
+    }
+}
+
+/// initialise ekf position reset check
+void AC_WPNav::init_ekf_position_reset()
+{
+    Vector2f pos_shift;
+    _loiter_ekf_pos_reset_ms = _ahrs.getLastPosNorthEastReset(pos_shift);
+}
+
+/// check for ekf position reset and adjust loiter or brake target position
+void AC_WPNav::check_for_ekf_position_reset()
+{
+    // check for position shift
+    Vector2f pos_shift;
+    uint32_t reset_ms = _ahrs.getLastPosNorthEastReset(pos_shift);
+    if (reset_ms != _loiter_ekf_pos_reset_ms) {
+        _pos_control.shift_pos_xy_target(pos_shift.x * 100.0f, pos_shift.y * 100.0f);
+        _loiter_ekf_pos_reset_ms = reset_ms;
     }
 }

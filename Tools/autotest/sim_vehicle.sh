@@ -22,11 +22,12 @@ WIPE_EEPROM=0
 REVERSE_THROTTLE=0
 NO_REBUILD=0
 START_HIL=0
-TRACKER_ARGS=""
+EXTRA_ARGS=""
 EXTERNAL_SIM=0
 MODEL=""
 BREAKPOINT=""
 OVERRIDE_BUILD_TARGET=""
+DELAY_START=0
 
 usage()
 {
@@ -42,7 +43,7 @@ Options:
     -D               build with debugging
     -B               add a breakpoint at given location in debugger
     -T               start an antenna tracker instance
-    -A               pass arguments to antenna tracker
+    -A               pass arguments to SITL instance
     -t               set antenna tracker start location
     -L               select start location from Tools/autotest/locations.txt
     -l               set the custom start location from -L
@@ -59,6 +60,7 @@ Options:
     -H               start HIL
     -e               use external simulator
     -S SPEEDUP       set simulation speedup (1 for wall clock time)
+    -d TIME          delays the start of mavproxy by the number of seconds
 
 mavproxy_options:
     --map            start with a map
@@ -75,7 +77,7 @@ EOF
 
 
 # parse options. Thanks to http://wiki.bash-hackers.org/howto/getopts_tutorial
-while getopts ":I:VgGcj:TA:t:L:l:v:hwf:RNHeMS:DB:b:" opt; do
+while getopts ":I:VgGcj:TA:t:L:l:v:hwf:RNHeMS:DB:b:d:" opt; do
   case $opt in
     v)
       VEHICLE=$OPTARG
@@ -97,7 +99,7 @@ while getopts ":I:VgGcj:TA:t:L:l:v:hwf:RNHeMS:DB:b:" opt; do
       START_ANTENNA_TRACKER=1
       ;;
     A)
-      TRACKER_ARGS="$OPTARG"
+      EXTRA_ARGS="$OPTARG"
       ;;
     R)
       REVERSE_THROTTLE=1
@@ -107,6 +109,9 @@ while getopts ":I:VgGcj:TA:t:L:l:v:hwf:RNHeMS:DB:b:" opt; do
       ;;
     D)
       DEBUG_BUILD=1
+      ;;
+    d)
+      DELAY_START="$OPTARG"
       ;;
     B)
       BREAKPOINT="$OPTARG"
@@ -270,10 +275,6 @@ case $FRAME in
         EXTRA_SIM="$EXTRA_SIM --frame=Gazebo"
         MODEL="$FRAME"
 	;;
-    CRRCSim-heli)
-	BUILD_TARGET="sitl-heli"
-        MODEL="$FRAME"
-	;;
     CRRCSim|last_letter*)
 	BUILD_TARGET="sitl"
         MODEL="$FRAME"
@@ -282,6 +283,10 @@ case $FRAME in
 	BUILD_TARGET="sitl"
         MODEL="$FRAME"
         check_jsbsim_version
+	;;
+    *-heli)
+	BUILD_TARGET="sitl-heli"
+        MODEL="$FRAME"
 	;;
     *)
         MODEL="$FRAME"
@@ -375,7 +380,7 @@ if [ $WIPE_EEPROM == 1 ]; then
     cmd="$cmd -w"
 fi
 
-cmd="$cmd --model $MODEL --speedup=$SPEEDUP"
+cmd="$cmd --model $MODEL --speedup=$SPEEDUP $EXTRA_ARGS"
 
 case $VEHICLE in
     ArduPlane)
@@ -446,6 +451,9 @@ if [ $START_HIL == 1 ]; then
 fi
 if [ $USE_MAVLINK_GIMBAL == 1 ]; then
     options="$options --load-module=gimbal"
+fi
+if [ $DELAY_START != 0 ]; then
+  sleep $DELAY_START
 fi
 
 if [ -f /usr/bin/cygstart ]; then

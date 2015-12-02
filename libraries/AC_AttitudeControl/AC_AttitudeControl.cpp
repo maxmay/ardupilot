@@ -5,7 +5,7 @@
 #include <AP_Math/AP_Math.h>
 
 // table of user settable parameters
-const AP_Param::GroupInfo AC_AttitudeControl::var_info[] PROGMEM = {
+const AP_Param::GroupInfo AC_AttitudeControl::var_info[] = {
 
     // 0, 1 were RATE_RP_MAX, RATE_Y_MAX
 
@@ -57,6 +57,8 @@ const AP_Param::GroupInfo AC_AttitudeControl::var_info[] PROGMEM = {
     // @User: Advanced
     AP_GROUPINFO("ACCEL_P_MAX", 7, AC_AttitudeControl, _accel_pitch_max, AC_ATTITUDE_CONTROL_ACCEL_RP_MAX_DEFAULT),
 
+    // IDs 8,9,10,11 RESERVED (in use on Solo)
+
     AP_GROUPEND
 };
 
@@ -107,6 +109,9 @@ void AC_AttitudeControl::angle_ef_roll_pitch_rate_ef_yaw_smooth(float roll_angle
 
     // sanity check smoothing gain
     smoothing_gain = constrain_float(smoothing_gain,1.0f,50.0f);
+
+    // add roll trim to compensate tail rotor thrust in heli (should return zero for multirotors)
+    roll_angle_ef += get_roll_trim();
 
     // if accel limiting and feed forward enabled
     if ((_accel_roll_max > 0.0f) && _rate_bf_ff_enabled) {
@@ -200,6 +205,9 @@ void AC_AttitudeControl::angle_ef_roll_pitch_rate_ef_yaw(float roll_angle_ef, fl
 {
     Vector3f    angle_ef_error;         // earth frame angle errors
 
+    // add roll trim to compensate tail rotor thrust in heli (should return zero for multirotors)
+    roll_angle_ef += get_roll_trim();
+
     // set earth-frame angle targets for roll and pitch and calculate angle error
     _angle_ef_target.x = constrain_float(roll_angle_ef, -_aparm.angle_max, _aparm.angle_max);
     angle_ef_error.x = wrap_180_cd_float(_angle_ef_target.x - _ahrs.roll_sensor);
@@ -244,6 +252,9 @@ void AC_AttitudeControl::angle_ef_roll_pitch_rate_ef_yaw(float roll_angle_ef, fl
 void AC_AttitudeControl::angle_ef_roll_pitch_yaw(float roll_angle_ef, float pitch_angle_ef, float yaw_angle_ef, bool slew_yaw)
 {
     Vector3f    angle_ef_error;
+
+    // add roll trim to compensate tail rotor thrust in heli (should return zero for multirotors)
+    roll_angle_ef += get_roll_trim();
 
     // set earth-frame angle targets
     _angle_ef_target.x = constrain_float(roll_angle_ef, -_aparm.angle_max, _aparm.angle_max);
@@ -444,7 +455,7 @@ bool AC_AttitudeControl::frame_conversion_bf_to_ef(const Vector3f& bf_vector, Ve
     if (is_zero(_ahrs.cos_pitch())) {
         return false;
     }
-    // convert earth frame angle or rates to body frame
+    // convert body frame angle or rates to earth frame
     ef_vector.x = bf_vector.x + _ahrs.sin_roll() * (_ahrs.sin_pitch()/_ahrs.cos_pitch()) * bf_vector.y + _ahrs.cos_roll() * (_ahrs.sin_pitch()/_ahrs.cos_pitch()) * bf_vector.z;
     ef_vector.y = _ahrs.cos_roll()  * bf_vector.y - _ahrs.sin_roll() * bf_vector.z;
     ef_vector.z = (_ahrs.sin_roll() / _ahrs.cos_pitch()) * bf_vector.y + (_ahrs.cos_roll() / _ahrs.cos_pitch()) * bf_vector.z;

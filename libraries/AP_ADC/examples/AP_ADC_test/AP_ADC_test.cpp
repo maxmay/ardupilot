@@ -10,7 +10,6 @@
 #include <AP_Math/AP_Math.h>
 #include <AP_Param/AP_Param.h>
 #include <StorageManager/StorageManager.h>
-#include <AP_Progmem/AP_Progmem.h>
 
 #include <AP_HAL/AP_HAL.h>
 
@@ -18,9 +17,10 @@
 
 uint32_t timer;
 
-#if CONFIG_HAL_BOARD == HAL_BOARD_APM1 || CONFIG_HAL_BOARD == HAL_BOARD_LINUX
-/* Only build this sketch for APM1 and Linux */
 const AP_HAL::HAL& hal = AP_HAL::get_HAL();
+
+/* Only build this sketch for Linux */
+#if CONFIG_HAL_BOARD == HAL_BOARD_LINUX
 
 AP_ADC_ADS7844 adc;
 
@@ -32,7 +32,7 @@ void setup()
     adc.Init();       // APM ADC initialization
 
     hal.scheduler->delay(1000);
-    timer = hal.scheduler->millis();
+    timer = AP_HAL::millis();
 }
 
 static const uint8_t channel_map[6] = { 1, 2, 0, 4, 5, 6};
@@ -42,7 +42,7 @@ uint32_t last_usec = 0;
 static void show_timing()
 {
     uint32_t mint = (uint32_t)-1, maxt = 0, totalt=0;
-    uint32_t start_time = hal.scheduler->millis();
+    uint32_t start_time = AP_HAL::millis();
     float result[6];
     uint32_t count = 0;
 
@@ -56,7 +56,7 @@ static void show_timing()
         if (deltat < mint) mint = deltat;
         totalt += deltat;
         count++;
-    } while ((hal.scheduler->millis() - start_time) < 5000);
+    } while ((AP_HAL::millis() - start_time) < 5000);
 
     hal.console->printf("timing: mint=%lu maxt=%lu avg=%lu\n", mint, maxt, totalt/count);
 }
@@ -86,9 +86,9 @@ static void show_data()
                 hal.console->printf("result[%u]=%f\n", (unsigned)i, result[i]);
             }
         }
-    } while ((hal.scheduler->millis() - timer) < 200);
+    } while ((AP_HAL::millis() - timer) < 200);
 
-    timer = hal.scheduler->millis();
+    timer = AP_HAL::millis();
     hal.console->printf("g=(%f,%f,%f) a=(%f,%f,%f) +/-(%.0f,%.0f,%.0f,%.0f,%.0f,%.0f) gt=%u dt=%u\n",
                   result[0], result[1], result[2],
                   result[3], result[4], result[5],
@@ -100,16 +100,15 @@ static void show_data()
 
 void loop()
 {
-    if (hal.scheduler->millis() < 5000) {
+    if (AP_HAL::millis() < 5000) {
         show_timing();
     } else {
         show_data();
     }
 }
 
-#else // Non-APM1:
-#warning AP_ADC_test built as stub for APM2
-const AP_HAL::HAL& hal = AP_HAL_AVR_APM2;
+#else
+#warning AP_ADC_test built as stub
 void setup () {}
 void loop () {}
 #endif  // CONFIG_HAL_BOARD

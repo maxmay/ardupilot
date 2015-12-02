@@ -38,7 +38,6 @@
 
 #include <AP_HAL/AP_HAL.h>
 #include <AP_Common/AP_Common.h>
-#include <AP_Progmem/AP_Progmem.h>
 #include <AP_Menu/AP_Menu.h>
 #include <AP_Param/AP_Param.h>
 #include <StorageManager/StorageManager.h>
@@ -94,6 +93,8 @@
 
 #include <AP_OpticalFlow/AP_OpticalFlow.h>     // Optical Flow library
 #include <AP_RSSI/AP_RSSI.h>                   // RSSI Library
+#include <AP_Parachute/AP_Parachute.h>
+#include <AP_ADSB/AP_ADSB.h>
 
 // Configuration
 #include "config.h"
@@ -550,10 +551,25 @@ private:
             FUNCTOR_BIND_MEMBER(&Plane::exit_mission_callback, void)};
 
 
+#if PARACHUTE == ENABLED
+    AP_Parachute parachute {relay};
+#endif
+
     // terrain handling
 #if AP_TERRAIN_AVAILABLE
     AP_Terrain terrain {ahrs, mission, rally};
 #endif
+
+    AP_ADSB adsb {ahrs};
+    struct {
+
+        // for Loiter_and_descend behavior, keeps track of rate changes
+        uint32_t time_last_alt_change_ms;
+
+        // previous wp to restore to when switching between modes back to AUTO
+        Location prev_wp;
+    } adsb_state;
+
 
     // Outback Challenge Failsafe Support
 #if OBC_FAILSAFE == ENABLED
@@ -715,7 +731,7 @@ private:
     void gcs_send_mission_item_reached_message(uint16_t mission_index);
     void gcs_data_stream_send(void);
     void gcs_update(void);
-    void gcs_send_text_P(MAV_SEVERITY severity, const prog_char_t *str);
+    void gcs_send_text(MAV_SEVERITY severity, const char *str);
     void gcs_send_airspeed_calibration(const Vector3f &vg);
     void gcs_retry_deferred(void);
 
@@ -905,6 +921,8 @@ private:
     void update_logging1(void);
     void update_logging2(void);
     void terrain_update(void);
+    void adsb_update(void);
+    void adsb_handle_vehicle_threats(void);
     void update_flight_mode(void);
     void stabilize();
     void set_servos_idle(void);
@@ -912,7 +930,7 @@ private:
     void update_aux();
     void update_is_flying_5Hz(void);
     void crash_detection_update(void);
-    void gcs_send_text_fmt(const prog_char_t *fmt, ...);
+    void gcs_send_text_fmt(MAV_SEVERITY severity, const char *fmt, ...);
     void handle_auto_mode(void);
     void calc_throttle();
     void calc_nav_roll();
@@ -965,12 +983,15 @@ private:
     void run_cli(AP_HAL::UARTDriver *port);
     bool restart_landing_sequence();
     void log_init();
-    uint32_t millis() const;
-    uint32_t micros() const;
     void init_capabilities(void);
     void dataflash_periodic(void);
     uint16_t throttle_min(void) const;
     
+    void do_parachute(const AP_Mission::Mission_Command& cmd);
+    void parachute_check();
+    void parachute_release();
+    bool parachute_manual_release();
+
 public:
     void mavlink_delay_cb();
     void failsafe_check(void);
@@ -1007,5 +1028,8 @@ public:
 
 extern const AP_HAL::HAL& hal;
 extern Plane plane;
+
+using AP_HAL::millis;
+using AP_HAL::micros;
 
 #endif // _PLANE_H_

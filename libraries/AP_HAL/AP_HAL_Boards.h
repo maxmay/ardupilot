@@ -6,13 +6,10 @@
  * C preprocesor enumeration of the boards supported by the AP_HAL.
  * This list exists so HAL_BOARD == HAL_BOARD_xxx preprocessor blocks
  * can be used to exclude HAL boards from the build when appropriate.
- * Its not an elegant solution but we cant get too fancy if we want to
- * work with the Arduino mk and IDE builds without too much modification.
+ * Its not an elegant solution but we can improve it in future.
  */
 
-#define HAL_BOARD_APM1     1
-#define HAL_BOARD_APM2     2
-#define HAL_BOARD_SITL 3
+#define HAL_BOARD_SITL     3
 #define HAL_BOARD_SMACCM   4 // unused
 #define HAL_BOARD_PX4      5
 #define HAL_BOARD_FLYMAPLE 6
@@ -35,18 +32,13 @@
 #define HAL_BOARD_SUBTYPE_LINUX_BEBOP    1006
 #define HAL_BOARD_SUBTYPE_LINUX_RASPILOT 1007
 #define HAL_BOARD_SUBTYPE_LINUX_MINLURE  1008
+#define HAL_BOARD_SUBTYPE_LINUX_ERLEBRAIN2 1009
 
 /**
    HAL PX4 sub-types, starting at 2000
  */
 #define HAL_BOARD_SUBTYPE_PX4_V1         2000
 #define HAL_BOARD_SUBTYPE_PX4_V2         2001
-
-/**
-   HAL AVR sub-types, starting at 3000
- */
-#define HAL_BOARD_SUBTYPE_AVR_APM1       3000
-#define HAL_BOARD_SUBTYPE_AVR_APM2       3001
 
 /**
    HAL VRBRAIN sub-types, starting at 4000
@@ -58,7 +50,6 @@
 #define HAL_BOARD_SUBTYPE_VRUBRAIN_V52   4004
 
 // InertialSensor driver types
-#define HAL_INS_OILPAN  1
 #define HAL_INS_MPU60XX_SPI 2
 #define HAL_INS_MPU60XX_I2C 3
 #define HAL_INS_HIL     4
@@ -70,6 +61,7 @@
 #define HAL_INS_L3GD20   10
 #define HAL_INS_LSM9DS0 11
 #define HAL_INS_RASPILOT 12
+#define HAL_INS_MPU9250_I2C 13
 
 // barometer driver types
 #define HAL_BARO_BMP085     1
@@ -90,6 +82,7 @@
 #define HAL_COMPASS_AK8963_I2C  6
 #define HAL_COMPASS_HMC5843_MPU6000 7
 #define HAL_COMPASS_RASPILOT  8
+#define HAL_COMPASS_AK8963_MPU9250_I2C  9
 
 // Heat Types
 #define HAL_LINUX_HEAT_PWM 1
@@ -99,7 +92,7 @@
 
    Note that these are only approximate, not exact CPU speeds.
  */
-#define HAL_CPU_CLASS_16   1   // 16Mhz, AVR2560 or similar
+#define HAL_CPU_CLASS_16   1   // DEPRECATED: 16Mhz, AVR2560 or similar
 #define HAL_CPU_CLASS_75   2   // 75Mhz, Flymaple or similar
 #define HAL_CPU_CLASS_150  3   // 150Mhz, PX4 or similar, assumes
                                // hardware floating point. Assumes tens
@@ -117,36 +110,7 @@
   HAL_OS_SOCKETS     :  has posix-like sockets
  */
 
-
-#if CONFIG_HAL_BOARD == HAL_BOARD_APM1
-#define HAL_BOARD_NAME "APM 1"
-#define HAL_CPU_CLASS HAL_CPU_CLASS_16
-#define HAL_STORAGE_SIZE            4096
-#define HAL_STORAGE_SIZE_AVAILABLE  HAL_STORAGE_SIZE
-#define HAL_INS_DEFAULT HAL_INS_OILPAN
-#define HAL_BARO_DEFAULT HAL_BARO_BMP085
-#define HAL_COMPASS_DEFAULT HAL_COMPASS_HMC5843
-#ifndef CONFIG_HAL_BOARD_SUBTYPE
-#define CONFIG_HAL_BOARD_SUBTYPE HAL_BOARD_SUBTYPE_AVR_APM1
-#endif
-
-#elif CONFIG_HAL_BOARD == HAL_BOARD_APM2
-#define HAL_BOARD_NAME "APM 2"
-#define HAL_CPU_CLASS HAL_CPU_CLASS_16
-#define HAL_STORAGE_SIZE            4096
-#define HAL_STORAGE_SIZE_AVAILABLE  HAL_STORAGE_SIZE
-#define HAL_INS_DEFAULT HAL_INS_MPU60XX_SPI
-#ifdef APM2_BETA_HARDWARE
-#define HAL_BARO_DEFAULT HAL_BARO_BMP085
-#else
-#define HAL_BARO_DEFAULT HAL_BARO_MS5611_SPI
-#endif
-#define HAL_COMPASS_DEFAULT HAL_COMPASS_HMC5843
-#ifndef CONFIG_HAL_BOARD_SUBTYPE
-#define CONFIG_HAL_BOARD_SUBTYPE HAL_BOARD_SUBTYPE_AVR_APM2
-#endif
-
-#elif CONFIG_HAL_BOARD == HAL_BOARD_SITL
+#if CONFIG_HAL_BOARD == HAL_BOARD_SITL
 #define HAL_BOARD_NAME "SITL"
 #define HAL_CPU_CLASS HAL_CPU_CLASS_1000
 #define HAL_OS_POSIX_IO 1
@@ -159,6 +123,11 @@
 #define HAL_INS_DEFAULT HAL_INS_HIL
 #define HAL_BARO_DEFAULT HAL_BARO_HIL
 #define HAL_COMPASS_DEFAULT HAL_COMPASS_HIL
+#define HAL_GPIO_A_LED_PIN        61
+#define HAL_GPIO_B_LED_PIN        48
+#define HAL_GPIO_C_LED_PIN        117
+#define HAL_GPIO_LED_ON           LOW
+#define HAL_GPIO_LED_OFF          HIGH
 
 #elif CONFIG_HAL_BOARD == HAL_BOARD_FLYMAPLE
 #define HAL_BOARD_NAME "FLYMAPLE"
@@ -170,6 +139,11 @@
 #define HAL_COMPASS_DEFAULT HAL_COMPASS_HMC5843
 #define HAL_SERIAL0_BAUD_DEFAULT 115200
 #define CONFIG_HAL_BOARD_SUBTYPE HAL_BOARD_SUBTYPE_NONE
+#define HAL_GPIO_A_LED_PIN        13
+#define HAL_GPIO_B_LED_PIN        13
+#define HAL_GPIO_C_LED_PIN        13
+#define HAL_GPIO_LED_ON           LOW
+#define HAL_GPIO_LED_OFF          HIGH
 
 #elif CONFIG_HAL_BOARD == HAL_BOARD_PX4
 #define HAL_BOARD_NAME "PX4"
@@ -189,6 +163,11 @@
 #define CONFIG_HAL_BOARD_SUBTYPE HAL_BOARD_SUBTYPE_PX4_V2
 #define HAL_STORAGE_SIZE            16384
 #endif
+#define HAL_GPIO_A_LED_PIN        27
+#define HAL_GPIO_B_LED_PIN        26
+#define HAL_GPIO_C_LED_PIN        25
+#define HAL_GPIO_LED_ON           LOW
+#define HAL_GPIO_LED_OFF          HIGH
 
 #elif CONFIG_HAL_BOARD == HAL_BOARD_LINUX
 #define HAL_BOARD_NAME "Linux"
@@ -203,12 +182,18 @@
 #define HAL_INS_DEFAULT HAL_INS_HIL
 #define HAL_BARO_DEFAULT HAL_BARO_HIL
 #define HAL_COMPASS_DEFAULT HAL_COMPASS_HIL
+
 #elif CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_PXF || CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_ERLEBOARD
 #define HAL_BOARD_LOG_DIRECTORY "/var/APM/logs"
 #define HAL_BOARD_TERRAIN_DIRECTORY "/var/APM/terrain"
 #define HAL_INS_DEFAULT HAL_INS_MPU9250
 #define HAL_BARO_DEFAULT HAL_BARO_MS5611_SPI
 #define HAL_COMPASS_DEFAULT HAL_COMPASS_AK8963_MPU9250
+#define HAL_GPIO_A_LED_PIN        61
+#define HAL_GPIO_B_LED_PIN        48
+#define HAL_GPIO_C_LED_PIN        117
+#define HAL_GPIO_LED_ON           LOW
+#define HAL_GPIO_LED_OFF          HIGH
 #elif CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_BEBOP
 #define HAL_BOARD_LOG_DIRECTORY "/data/ftp/internal_000/APM/logs"
 #define HAL_BOARD_TERRAIN_DIRECTORY "/data/ftp/internal_000/APM/terrain"
@@ -222,7 +207,7 @@
 #define HAL_BARO_MS5607_I2C_ADDR 0x77
 #define HAL_BARO_DEFAULT HAL_BARO_MS5607
 #define HAL_UTILS_HEAT HAL_LINUX_HEAT_PWM
-#define HAL_LINUX_HEAT_PWM_SYSFS_DIR "/sys/class/pwm/pwm_6"
+#define HAL_LINUX_HEAT_PWM_NUM  6
 #define HAL_LINUX_HEAT_KP 20000
 #define HAL_LINUX_HEAT_KI 6
 #define HAL_LINUX_HEAT_PERIOD_NS 125000
@@ -243,12 +228,28 @@
 #define HAL_BARO_MS5611_I2C_BUS 0
 #define HAL_BARO_MS5611_I2C_ADDR 0x77
 #define HAL_COMPASS_DEFAULT HAL_COMPASS_AK8963_MPU9250
+#define HAL_GPIO_A_LED_PIN        16
+#define HAL_GPIO_B_LED_PIN        16
+#define HAL_GPIO_C_LED_PIN        16
+#define HAL_GPIO_LED_ON           LOW
+#define HAL_GPIO_LED_OFF          HIGH
 #elif CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_RASPILOT
 #define HAL_BOARD_LOG_DIRECTORY "/var/APM/logs"
 #define HAL_BOARD_TERRAIN_DIRECTORY "/var/APM/terrain"
 #define HAL_INS_DEFAULT HAL_INS_RASPILOT
 #define HAL_BARO_DEFAULT HAL_BARO_MS5611_SPI
 #define HAL_COMPASS_DEFAULT HAL_COMPASS_RASPILOT
+#elif CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_ERLEBRAIN2
+#define HAL_BOARD_LOG_DIRECTORY "/var/APM/logs"
+#define HAL_BOARD_TERRAIN_DIRECTORY "/var/APM/terrain"
+#define HAL_INS_DEFAULT HAL_INS_MPU9250
+#define HAL_BARO_DEFAULT HAL_BARO_MS5611_SPI
+#define HAL_COMPASS_DEFAULT HAL_COMPASS_AK8963_MPU9250
+#define HAL_GPIO_A_LED_PIN        24
+#define HAL_GPIO_B_LED_PIN        25
+#define HAL_GPIO_C_LED_PIN        16
+#define HAL_GPIO_LED_ON           LOW
+#define HAL_GPIO_LED_OFF          HIGH
 #elif CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_ZYNQ
 #define HAL_BOARD_LOG_DIRECTORY "/var/APM/logs"
 #define HAL_BOARD_TERRAIN_DIRECTORY "/var/APM/terrain"
@@ -262,6 +263,11 @@
 #define HAL_INS_DEFAULT HAL_INS_MPU9250
 #define HAL_BARO_DEFAULT HAL_BARO_MS5611_SPI
 #define HAL_COMPASS_DEFAULT HAL_COMPASS_AK8963_MPU9250
+#define HAL_GPIO_A_LED_PIN        61
+#define HAL_GPIO_B_LED_PIN        48
+#define HAL_GPIO_C_LED_PIN        117
+#define HAL_GPIO_LED_ON           LOW
+#define HAL_GPIO_LED_OFF          HIGH
 #else
 #error "no Linux board subtype set"
 #endif
@@ -305,6 +311,15 @@
 #define CONFIG_HAL_BOARD_SUBTYPE HAL_BOARD_SUBTYPE_NONE
 #define HAL_STORAGE_SIZE            8192
 #endif
+#define HAL_GPIO_A_LED_PIN        25
+#define HAL_GPIO_B_LED_PIN        26
+#define HAL_GPIO_C_LED_PIN        27
+#define HAL_GPIO_LED_ON           HIGH
+#define HAL_GPIO_LED_OFF          LOW
+#define EXTERNAL_LED_GPS     28    // GPS LED - AN10
+#define EXTERNAL_LED_ARMED   29    // Armed LED - AN11
+#define EXTERNAL_LED_MOTOR1  30    // Motor1 LED - AN8
+#define EXTERNAL_LED_MOTOR2  31    // Motor2 LED - AN12
 
 #else
 #error "Unknown CONFIG_HAL_BOARD type"

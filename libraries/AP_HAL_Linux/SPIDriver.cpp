@@ -44,6 +44,12 @@ SPIDeviceDriver SPIDeviceManager::_device[] = {
     SPIDeviceDriver(0, 1, AP_HAL::SPIDevice_MPU9250, SPI_MODE_0, 8, SPI_CS_KERNEL,  1*MHZ, 20*MHZ),
     SPIDeviceDriver(0, 0, AP_HAL::SPIDevice_Ublox, SPI_MODE_0, 8, SPI_CS_KERNEL,  250*KHZ, 5*MHZ),
 };
+#elif CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_ERLEBRAIN2
+SPIDeviceDriver SPIDeviceManager::_device[] = {
+    /* MPU9250 is restricted to 1MHz for non-data and interrupt registers */
+    SPIDeviceDriver(0, 1, AP_HAL::SPIDevice_MPU9250, SPI_MODE_0, 8, SPI_CS_KERNEL,  1*MHZ, 20*MHZ),
+    SPIDeviceDriver(0, 0, AP_HAL::SPIDevice_MS5611,  SPI_MODE_0, 8, SPI_CS_KERNEL,  1*KHZ, 10*MHZ),
+};
 #elif CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_BBBMINI
 SPIDeviceDriver SPIDeviceManager::_device[] = {
     /* MPU9250 is restricted to 1MHz for non-data and interrupt registers */
@@ -90,7 +96,7 @@ void SPIDeviceDriver::init()
     if(_cs_pin != SPI_CS_KERNEL) {
         _cs = hal.gpio->channel(_cs_pin);
         if (_cs == NULL) {
-            hal.scheduler->panic("Unable to instantiate cs pin");
+            AP_HAL::panic("Unable to instantiate cs pin");
         }
         _cs->mode(HAL_GPIO_OUTPUT);
         _cs->write(1);       // do not hold the SPI bus initially
@@ -140,11 +146,11 @@ void SPIDeviceDriver::transfer(const uint8_t *data, uint16_t len)
     transaction(data, NULL, len);
 }
 
-void SPIDeviceManager::init(void *)
+void SPIDeviceManager::init()
 {
     for (uint8_t i=0; i<LINUX_SPI_DEVICE_NUM_DEVICES; i++) {
         if (_device[i]._bus >= LINUX_SPI_MAX_BUSES) {
-            hal.scheduler->panic("SPIDriver: invalid bus number");
+            AP_HAL::panic("SPIDriver: invalid bus number");
         }
         char path[255];
         snprintf(path, sizeof(path), "/dev/spidev%u.%u",
@@ -152,7 +158,7 @@ void SPIDeviceManager::init(void *)
         _device[i]._fd = open(path, O_RDWR);
         if (_device[i]._fd == -1) {
             printf("Unable to open %s - %s\n", path, strerror(errno));
-            hal.scheduler->panic("SPIDriver: unable to open SPI bus");
+            AP_HAL::panic("SPIDriver: unable to open SPI bus");
         }
 #if SPI_DEBUGGING
         printf("Opened %s\n", path);
@@ -172,7 +178,7 @@ void SPIDeviceManager::cs_assert(enum AP_HAL::SPIDevice type)
         }
     }
     if (i == LINUX_SPI_DEVICE_NUM_DEVICES) {
-        hal.scheduler->panic("Bad device type");
+        AP_HAL::panic("Bad device type");
     }
 
     // Kernel-mode CS handling
@@ -208,7 +214,7 @@ void SPIDeviceManager::cs_release(enum AP_HAL::SPIDevice type)
         }
     }
     if (i == LINUX_SPI_DEVICE_NUM_DEVICES) {
-        hal.scheduler->panic("Bad device type");
+        AP_HAL::panic("Bad device type");
     }
 
     // Kernel-mode CS handling

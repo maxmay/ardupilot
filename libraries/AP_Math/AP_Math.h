@@ -8,9 +8,6 @@
 #include <AP_Common/AP_Common.h>
 #include <AP_Param/AP_Param.h>
 #include <math.h>
-#ifdef __AVR__
-# include "AP_Math_AVR_Compat.h"
-#endif
 #include <stdint.h>
 #include "rotations.h"
 #include "vector2.h"
@@ -40,11 +37,9 @@
 
 //GPS Specific double precision conversions
 //The precision here does matter when using the wsg* functions for converting
-//between LLH and ECEF coordinates. Test code in examlpes/location/location.pde
-#if HAL_CPU_CLASS >= HAL_CPU_CLASS_75
-	#define DEG_TO_RAD_DOUBLE 0.0174532925199432954743716805978692718781530857086181640625  // equals to (M_PI / 180.0)
-	#define RAD_TO_DEG_DOUBLE 57.29577951308232286464772187173366546630859375               // equals to (180.0 / M_PI)
-#endif
+//between LLH and ECEF coordinates. Test code in examlpes/location/location.cpp
+#define DEG_TO_RAD_DOUBLE 0.0174532925199432954743716805978692718781530857086181640625  // equals to (M_PI / 180.0)
+#define RAD_TO_DEG_DOUBLE 57.29577951308232286464772187173366546630859375               // equals to (180.0 / M_PI)
 
 #define RadiansToCentiDegrees(x) ((x) * 5729.5779513082320876798154814105f)
 
@@ -160,17 +155,15 @@ bool locations_are_same(const struct Location &loc1, const struct Location &loc2
  */
 void print_latlon(AP_HAL::BetterStream *s, int32_t lat_or_lon);
 
-#if HAL_CPU_CLASS >= HAL_CPU_CLASS_75
 // Converts from WGS84 geodetic coordinates (lat, lon, height)
 // into WGS84 Earth Centered, Earth Fixed (ECEF) coordinates
 // (X, Y, Z)
 void wgsllh2ecef(const Vector3d &llh, Vector3d &ecef);
 
-// Converts from WGS84 Earth Centered, Earth Fixed (ECEF) 
-// coordinates (X, Y, Z), into WHS84 geodetic 
+// Converts from WGS84 Earth Centered, Earth Fixed (ECEF)
+// coordinates (X, Y, Z), into WHS84 geodetic
 // coordinates (lat, lon, height)
 void wgsecef2llh(const Vector3d &ecef, Vector3d &llh);
-#endif
 
 // constrain a value
 // constrain a value
@@ -227,18 +220,37 @@ static inline float pythagorous3(float a, float b, float c) {
 #error "Build is including Arduino base headers"
 #endif
 
-/* The following three functions used to be arduino core macros */
-#define max(a,b) ((a)>(b)?(a):(b))
-#define min(a,b) ((a)<(b)?(a):(b))
-
-static inline float maxf(float a, float b)
-{
-    return (a>b?a:b);
+template<typename A, typename B>
+static inline auto MIN(const A &one, const B &two) -> decltype(one < two ? one : two) {
+    return one < two ? one : two;
 }
 
-static inline float minf(float a, float b)
+template<typename A, typename B>
+static inline auto MAX(const A &one, const B &two) -> decltype(one > two ? one : two) {
+    return one > two ? one : two;
+}
+
+#define NSEC_PER_SEC 1000000000ULL
+#define NSEC_PER_USEC 1000ULL
+
+inline uint32_t hz_to_nsec(uint32_t freq)
 {
-    return (a<b?a:b);
+    return NSEC_PER_SEC / freq;
+}
+
+inline uint32_t nsec_to_hz(uint32_t usec)
+{
+    return NSEC_PER_SEC / usec;
+}
+
+inline uint32_t usec_to_nsec(uint32_t usec)
+{
+    return usec * NSEC_PER_USEC;
+}
+
+inline uint32_t nsec_to_usec(uint32_t nsec)
+{
+    return nsec / NSEC_PER_USEC;
 }
 
 #undef INLINE

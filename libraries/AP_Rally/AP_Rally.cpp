@@ -32,7 +32,7 @@ StorageAccess AP_Rally::_storage(StorageManager::StorageRally);
 #define RALLY_INCLUDE_HOME_DEFAULT 0
 #endif
 
-const AP_Param::GroupInfo AP_Rally::var_info[] PROGMEM = {
+const AP_Param::GroupInfo AP_Rally::var_info[] = {
     // @Param: TOTAL
     // @DisplayName: Rally Total
     // @Description: Number of rally points currently loaded
@@ -94,7 +94,7 @@ bool AP_Rally::set_rally_point_with_index(uint8_t i, const RallyLocation &rallyL
 
     _storage.write_block(i * sizeof(RallyLocation), &rallyLoc, sizeof(RallyLocation));
 
-    _last_change_time_ms = hal.scheduler->millis();
+    _last_change_time_ms = AP_HAL::millis();
 
     return true;
 }

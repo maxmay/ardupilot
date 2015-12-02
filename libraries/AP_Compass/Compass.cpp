@@ -1,6 +1,5 @@
 /// -*- tab-width: 4; Mode: C++; c-basic-offset: 4; indent-tabs-mode: nil -*-
 #include <AP_HAL/AP_HAL.h>
-#include <AP_Progmem/AP_Progmem.h>
 #include "Compass.h"
 #include <AP_Vehicle/AP_Vehicle.h>
 
@@ -12,7 +11,7 @@ extern AP_HAL::HAL& hal;
 #define COMPASS_LEARN_DEFAULT 1
 #endif
 
-const AP_Param::GroupInfo Compass::var_info[] PROGMEM = {
+const AP_Param::GroupInfo Compass::var_info[] = {
     // index 0 was used for the old orientation matrix
 
     // @Param: OFS_X
@@ -401,7 +400,7 @@ Compass::init()
 uint8_t Compass::register_compass(void)
 {
     if (_compass_count == COMPASS_MAX_INSTANCES) {
-        hal.scheduler->panic(PSTR("Too many compass instances"));
+        AP_HAL::panic("Too many compass instances");
     }
     return _compass_count++;
 }
@@ -411,7 +410,7 @@ void Compass::_add_backend(AP_Compass_Backend *backend)
     if (!backend)
         return;
     if (_backend_count == COMPASS_MAX_BACKEND)
-        hal.scheduler->panic(PSTR("Too many compass backends"));
+        AP_HAL::panic("Too many compass backends");
     _backends[_backend_count++] = backend;
 }
 
@@ -433,7 +432,7 @@ void Compass::_detect_backends(void)
       CONFIG_HAL_BOARD_SUBTYPE != HAL_BOARD_SUBTYPE_LINUX_BEBOP && \
       CONFIG_HAL_BOARD_SUBTYPE != HAL_BOARD_SUBTYPE_LINUX_MINLURE
     _add_backend(AP_Compass_HMC5843::detect_i2c(*this, hal.i2c));
-    _add_backend(AP_Compass_AK8963::detect_mpu9250(*this, hal.spi->device(AP_HAL::SPIDevice_MPU9250)));
+    _add_backend(AP_Compass_AK8963::detect_mpu9250(*this, 0));
 #elif HAL_COMPASS_DEFAULT == HAL_COMPASS_HIL
     _add_backend(AP_Compass_HIL::detect(*this));
 #elif HAL_COMPASS_DEFAULT == HAL_COMPASS_HMC5843
@@ -443,15 +442,20 @@ void Compass::_detect_backends(void)
 #elif  HAL_COMPASS_DEFAULT == HAL_COMPASS_AK8963_I2C && HAL_INS_AK8963_I2C_BUS == 1
     _add_backend(AP_Compass_AK8963::detect_i2c(*this, hal.i2c1,
                                                HAL_COMPASS_AK8963_I2C_ADDR));
+#elif HAL_COMPASS_DEFAULT == HAL_COMPASS_AK8963_MPU9250_I2C
+    _add_backend(AP_Compass_AK8963::detect_mpu9250_i2c(*this, HAL_COMPASS_AK8963_I2C_POINTER,
+                                                       HAL_COMPASS_AK8963_I2C_ADDR));
 #elif HAL_COMPASS_DEFAULT == HAL_COMPASS_PX4 || HAL_COMPASS_DEFAULT == HAL_COMPASS_VRBRAIN
     _add_backend(AP_Compass_PX4::detect(*this));
+#elif HAL_COMPASS_DEFAULT == HAL_COMPASS_AK8963_MPU9250
+    _add_backend(AP_Compass_AK8963::detect_mpu9250(*this, 0));
 #else
     #error Unrecognised HAL_COMPASS_TYPE setting
 #endif
 
     if (_backend_count == 0 ||
         _compass_count == 0) {
-        hal.console->println_P(PSTR("No Compass backends available"));
+        hal.console->println("No Compass backends available");
     }
 }
 
@@ -472,7 +476,7 @@ Compass::read(void)
         _backends[i]->read();
     }    
     for (uint8_t i=0; i < COMPASS_MAX_INSTANCES; i++) {
-        _state[i].healthy = (hal.scheduler->millis() - _state[i].last_update_ms < 500);
+        _state[i].healthy = (AP_HAL::millis() - _state[i].last_update_ms < 500);
     }
     return healthy();
 }
@@ -720,7 +724,7 @@ void Compass::setHIL(uint8_t instance, const Vector3f &mag)
 {
     _hil.field[instance] = mag;
     _hil.healthy[instance] = true;
-    _state[instance].last_update_usec = hal.scheduler->micros();
+    _state[instance].last_update_usec = AP_HAL::micros();
 }
 
 const Vector3f& Compass::getHIL(uint8_t instance) const 

@@ -56,6 +56,7 @@ DataFlash_File::DataFlash_File(DataFlash_Class &front, const char *log_directory
     _initialised(false),
     _open_error(false),
     _log_directory(log_directory),
+    _cached_oldest_log(0),
     _writebuf(NULL),
     _writebuf_size(16*1024),
 #if defined(CONFIG_ARCH_BOARD_PX4FMU_V1)
@@ -229,6 +230,10 @@ float DataFlash_File::avail_space_percent()
 // returns 0 if no log was found
 uint16_t DataFlash_File::find_oldest_log()
 {
+    if (_cached_oldest_log != 0) {
+        return _cached_oldest_log;
+    }
+
     uint16_t last_log_num = find_last_log();
     if (last_log_num == 0) {
         return 0;
@@ -281,6 +286,7 @@ uint16_t DataFlash_File::find_oldest_log()
         }
     }
     closedir(d);
+    _cached_oldest_log = current_oldest_log;
 
     return current_oldest_log;
 }
@@ -292,6 +298,8 @@ void DataFlash_File::Prep_MinSpace()
         // no files to remove
         return;
     }
+
+    _cached_oldest_log = 0;
 
     uint16_t log_to_remove = first_log_to_remove;
 
@@ -407,6 +415,8 @@ void DataFlash_File::EraseAll()
         unlink(fname);
         free(fname);
     }
+
+    _cached_oldest_log = 0;
 }
 
 /* Write a block of data at current offset */
@@ -584,7 +594,7 @@ void DataFlash_File::get_log_boundaries(const uint16_t list_entry, uint16_t & st
 }
 
 /*
-  find the number of pages in a log
+  retrieve data from a log file
  */
 int16_t DataFlash_File::get_log_data(const uint16_t list_entry, const uint16_t page, const uint32_t offset, const uint16_t len, uint8_t *data)
 {
@@ -738,6 +748,8 @@ uint16_t DataFlash_File::start_new_log(void)
     }
     char *fname = _log_file_name(log_num);
     _write_fd = ::open(fname, O_WRONLY|O_CREAT|O_TRUNC, 0666);
+    _cached_oldest_log = 0;
+
     if (_write_fd == -1) {
         _initialised = false;
         _open_error = true;
@@ -855,13 +867,13 @@ void DataFlash_File::LogReadProcess(const uint16_t list_entry,
  */
 void DataFlash_File::DumpPageInfo(AP_HAL::BetterStream *port)
 {
-    port->printf_P(PSTR("DataFlash: num_logs=%u\n"), 
+    port->printf("DataFlash: num_logs=%u\n", 
                    (unsigned)get_num_logs());    
 }
 
 void DataFlash_File::ShowDeviceInfo(AP_HAL::BetterStream *port)
 {
-    port->printf_P(PSTR("DataFlash logs stored in %s\n"), 
+    port->printf("DataFlash logs stored in %s\n", 
                    _log_directory);
 }
 
@@ -874,10 +886,10 @@ void DataFlash_File::ListAvailableLogs(AP_HAL::BetterStream *port)
     uint16_t num_logs = get_num_logs();
 
     if (num_logs == 0) {
-        port->printf_P(PSTR("\nNo logs\n\n"));
+        port->printf("\nNo logs\n\n");
         return;
     }
-    port->printf_P(PSTR("\n%u logs\n"), (unsigned)num_logs);
+    port->printf("\n%u logs\n", (unsigned)num_logs);
 
     for (uint16_t i=1; i<=num_logs; i++) {
         uint16_t log_num = _log_num_from_list_entry(i);
@@ -886,7 +898,7 @@ void DataFlash_File::ListAvailableLogs(AP_HAL::BetterStream *port)
                 struct stat st;
                 if (stat(filename, &st) == 0) {
                     struct tm *tm = gmtime(&st.st_mtime);
-                    port->printf_P(PSTR("Log %u in %s of size %u %u/%u/%u %u:%u\n"),
+                    port->printf("Log %u in %s of size %u %u/%u/%u %u:%u\n",
                                    (unsigned)i,
                                    filename,
                                    (unsigned)st.st_size,
@@ -906,7 +918,7 @@ void DataFlash_File::ListAvailableLogs(AP_HAL::BetterStream *port)
 void DataFlash_File::flush(void)
 {
     uint16_t _tail;
-    uint32_t tnow = hal.scheduler->micros();
+    uint32_t tnow = AP_HAL::micros();
     hal.scheduler->suspend_timer_procs();
     while (_write_fd != -1 && _initialised && !_open_error &&
            BUF_AVAILABLE(_writebuf)) {
@@ -933,7 +945,7 @@ void DataFlash_File::_io_timer(void)
     if (nbytes == 0) {
         return;
     }
-    uint32_t tnow = hal.scheduler->micros();
+    uint32_t tnow = AP_HAL::micros();
     if (nbytes < _writebuf_chunk && 
         tnow - _last_write_time < 2000000UL) {
         // write in _writebuf_chunk-sized chunks, but always write at
@@ -950,7 +962,7 @@ void DataFlash_File::_io_timer(void)
     }
     if (_writebuf_head > _tail) {
         // only write to the end of the buffer
-        nbytes = min(nbytes, _writebuf_size - _writebuf_head);
+        nbytes = MIN(nbytes, _writebuf_size - _writebuf_head);
     }
 
     // try to align writes on a 512 byte boundary to avoid filesystem

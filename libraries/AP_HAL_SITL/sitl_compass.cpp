@@ -47,8 +47,8 @@ void SITL_State::_update_compass(float rollDeg, float pitchDeg, float yawDeg)
     Vector3f motor = _sitl->mag_mot.get() * _current;
     Vector3f new_mag_data = _compass->getHIL(0) + noise + motor;
 
-    // 100Hz, to match the real APM2 compass
-    uint32_t now = hal.scheduler->millis();
+    // 100Hz
+    uint32_t now = AP_HAL::millis();
     if ((now - last_update) < 10) {
         return;
     }

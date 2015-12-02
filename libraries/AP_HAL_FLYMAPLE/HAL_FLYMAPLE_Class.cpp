@@ -73,21 +73,19 @@ void HAL_FLYMAPLE::run(int argc, char* const argv[], Callbacks* callbacks) const
     /* initialize all drivers and private members here.
      * up to the programmer to do this in the correct order.
      * Scheduler should likely come first. */
-    scheduler->init(NULL);
+    scheduler->init();
 
     /* uartA is the serial port used for the console, so lets make sure
      * it is initialized at boot */
     uartA->begin(115200);
 
-    /* The AVR RCInput drivers take an AP_HAL_AVR::ISRRegistry*
-     * as the init argument */
-    rcin->init(NULL);
-    rcout->init(NULL);
-    spi->init(NULL);
+    rcin->init();
+    rcout->init();
+    spi->init();
     i2c->begin();
     i2c->setTimeout(100);
-    analogin->init(NULL);
-    storage->init(NULL); // Uses EEPROM.*, flash_stm* copied from AeroQuad_v3.2
+    analogin->init();
+    storage->init(); // Uses EEPROM.*, flash_stm* copied from AeroQuad_v3.2
 
     callbacks->setup();
     scheduler->system_initialized();

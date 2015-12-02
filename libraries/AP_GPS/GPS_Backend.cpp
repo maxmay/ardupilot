@@ -60,8 +60,6 @@ int16_t AP_GPS_Backend::swap_int16(int16_t v) const
 
 /**
    calculate current time since the unix epoch in microseconds
-
-   This costs about 60 usec on AVR2560
  */
 uint64_t AP_GPS::time_epoch_usec(uint8_t instance)
 {
@@ -73,15 +71,13 @@ uint64_t AP_GPS::time_epoch_usec(uint8_t instance)
     const uint64_t unix_offset = 17000ULL*86400ULL + 52*10*7000ULL*86400ULL - 15000ULL;
     uint64_t fix_time_ms = unix_offset + istate.time_week*ms_per_week + istate.time_week_ms;
     // add in the milliseconds since the last fix
-    return (fix_time_ms + (hal.scheduler->millis() - istate.last_gps_time_ms)) * 1000ULL;
+    return (fix_time_ms + (AP_HAL::millis() - istate.last_gps_time_ms)) * 1000ULL;
 }
 
 
 /**
    fill in time_week_ms and time_week from BCD date and time components
    assumes MTK19 millisecond form of bcd_time
-
-   This function takes about 340 usec on the AVR2560
  */
 void AP_GPS_Backend::make_gps_time(uint32_t bcd_date, uint32_t bcd_milliseconds)
 {

@@ -28,7 +28,7 @@
 #define GOBJECT(v, name, class) { AP_PARAM_GROUP, name, Parameters::k_param_ ## v, (const void *)&copter.v, {group_info : class::var_info} }
 #define GOBJECTN(v, pname, name, class) { AP_PARAM_GROUP, name, Parameters::k_param_ ## pname, (const void *)&copter.v, {group_info : class::var_info} }
 
-const AP_Param::Info Copter::var_info[] PROGMEM = {
+const AP_Param::Info Copter::var_info[] = {
     // @Param: SYSID_SW_MREV
     // @DisplayName: Eeprom format version number
     // @Description: This value is incremented when changes are made to the eeprom format
@@ -121,12 +121,21 @@ const AP_Param::Info Copter::var_info[] PROGMEM = {
 
     // @Param: RTL_ALT
     // @DisplayName: RTL Altitude
-    // @Description: The minimum altitude the model will move to before Returning to Launch.  Set to zero to return at current altitude.
+    // @Description: The minimum relative altitude the model will move to before Returning to Launch.  Set to zero to return at current altitude.
     // @Units: Centimeters
     // @Range: 0 8000
     // @Increment: 1
     // @User: Standard
     GSCALAR(rtl_altitude,   "RTL_ALT",     RTL_ALT),
+
+    // @Param: RTL_SPEED
+    // @DisplayName: RTL speed
+    // @Description: Defines the speed in cm/s which the aircraft will attempt to maintain horizontally while flying home. If this is set to zero, WPNAV_SPEED will be used instead.
+    // @Units: cm/s
+    // @Range: 0 2000
+    // @Increment: 50
+    // @User: Standard
+    GSCALAR(rtl_speed_cms,   "RTL_SPEED",     0),
 
     // @Param: RNGFND_GAIN
     // @DisplayName: Rangefinder gain
@@ -519,24 +528,6 @@ const AP_Param::Info Copter::var_info[] PROGMEM = {
     // @Group: H_RSC_
     // @Path: ../libraries/RC_Channel/RC_Channel.cpp
     GGROUP(heli_servo_rsc,    "H_RSC_", RC_Channel),
-
-    // @Param: H_STAB_COL_MIN
-    // @DisplayName: Heli Stabilize Throttle Collective Minimum
-    // @Description: Helicopter's minimum collective position while pilot directly controls collective in stabilize mode
-    // @Range: 0 500
-    // @Units: Percent*10
-    // @Increment: 1
-    // @User: Standard
-    GSCALAR(heli_stab_col_min, "H_STAB_COL_MIN", HELI_STAB_COLLECTIVE_MIN_DEFAULT),
-
-    // @Param: H_STAB_COL_MAX
-    // @DisplayName: Stabilize Throttle Maximum
-    // @Description: Helicopter's maximum collective position while pilot directly controls collective in stabilize mode
-    // @Range: 500 1000
-    // @Units: Percent*10
-    // @Increment: 1
-    // @User: Standard
-    GSCALAR(heli_stab_col_max, "H_STAB_COL_MAX", HELI_STAB_COLLECTIVE_MAX_DEFAULT),
 #endif
 
     // RC channel
@@ -901,6 +892,12 @@ const AP_Param::Info Copter::var_info[] PROGMEM = {
     // @Path: ../libraries/AP_LandingGear/AP_LandingGear.cpp
     GOBJECT(landinggear,    "LGR_", AP_LandingGear),
 
+#if FRAME_CONFIG == HELI_FRAME
+    // @Group: IM_
+    // @Path: ../libraries/AC_InputManager/AC_InputManager_Heli.cpp
+    GOBJECT(input_manager, "IM_", AC_InputManager_Heli),
+#endif
+
     // @Group: COMPASS_
     // @Path: ../libraries/AP_Compass/Compass.cpp
     GOBJECT(compass,        "COMPASS_", Compass),
@@ -937,17 +934,13 @@ const AP_Param::Info Copter::var_info[] PROGMEM = {
     // @Path: GCS_Mavlink.cpp
     GOBJECTN(gcs[1],  gcs1,       "SR1_",     GCS_MAVLINK),
 
-#if MAVLINK_COMM_NUM_BUFFERS > 2
     // @Group: SR2_
     // @Path: GCS_Mavlink.cpp
     GOBJECTN(gcs[2],  gcs2,       "SR2_",     GCS_MAVLINK),
-#endif
 
-#if MAVLINK_COMM_NUM_BUFFERS > 3
     // @Group: SR3_
     // @Path: GCS_Mavlink.cpp
     GOBJECTN(gcs[3],  gcs3,       "SR3_",     GCS_MAVLINK),
-#endif
 
     // @Group: AHRS_
     // @Path: ../libraries/AP_AHRS/AP_AHRS.cpp
@@ -1072,7 +1065,7 @@ const AP_Param::Info Copter::var_info[] PROGMEM = {
     GOBJECT(sonar,   "RNGFND", RangeFinder),
 #endif
 
-#if AP_TERRAIN_AVAILABLE
+#if AP_TERRAIN_AVAILABLE && AC_TERRAIN
     // @Group: TERRAIN_
     // @Path: ../libraries/AP_Terrain/AP_Terrain.cpp
     GOBJECT(terrain,                "TERRAIN_", AP_Terrain),
@@ -1094,6 +1087,10 @@ const AP_Param::Info Copter::var_info[] PROGMEM = {
     // @Path: ../libraries/AP_RPM/AP_RPM.cpp
     GOBJECT(rpm_sensor, "RPM", AP_RPM),
 
+    // @Group: ADSB_
+    // @Path: ../libraries/AP_ADSB/AP_ADSB.cpp
+    GOBJECT(adsb,                "ADSB_", AP_ADSB),
+
     // @Param: AUTOTUNE_AXES
     // @DisplayName: Autotune axis bitmask
     // @Description: 1-byte bitmap of axes to autotune
@@ -1114,7 +1111,7 @@ const AP_Param::Info Copter::var_info[] PROGMEM = {
     // @Description: Defines the minimum D gain
     // @Range: 0.001 0.006
     // @User: Standard
-    GSCALAR(autotune_min_d, "AUTOTUNE_MIN_D", 0.004f),
+    GSCALAR(autotune_min_d, "AUTOTUNE_MIN_D", 0.001f),
 
     AP_VAREND
 };
@@ -1132,7 +1129,7 @@ const AP_Param::Info Copter::var_info[] PROGMEM = {
   The second column below is the index in the var_info[] table for the
   old object. This should be zero for top level parameters.
  */
-const AP_Param::ConversionInfo conversion_table[] PROGMEM = {
+const AP_Param::ConversionInfo conversion_table[] = {
     { Parameters::k_param_battery_monitoring, 0,      AP_PARAM_INT8,  "BATT_MONITOR" },
     { Parameters::k_param_battery_volt_pin,   0,      AP_PARAM_INT8,  "BATT_VOLT_PIN" },
     { Parameters::k_param_battery_curr_pin,   0,      AP_PARAM_INT8,  "BATT_CURR_PIN" },
@@ -1148,8 +1145,8 @@ const AP_Param::ConversionInfo conversion_table[] PROGMEM = {
 void Copter::load_parameters(void)
 {
     if (!AP_Param::check_var_info()) {
-        cliSerial->printf_P(PSTR("Bad var table\n"));
-        hal.scheduler->panic(PSTR("Bad var table"));
+        cliSerial->printf("Bad var table\n");
+        AP_HAL::panic("Bad var table");
     }
 
     // disable centrifugal force correction, it will be enabled as part of the arming process
@@ -1160,17 +1157,17 @@ void Copter::load_parameters(void)
         g.format_version != Parameters::k_format_version) {
 
         // erase all parameters
-        cliSerial->printf_P(PSTR("Firmware change: erasing EEPROM...\n"));
+        cliSerial->printf("Firmware change: erasing EEPROM...\n");
         AP_Param::erase_all();
 
         // save the current format version
         g.format_version.set_and_save(Parameters::k_format_version);
-        cliSerial->println_P(PSTR("done."));
+        cliSerial->println("done.");
     } else {
         uint32_t before = micros();
         // Load all auto-loaded EEPROM variables
         AP_Param::load_all();
         AP_Param::convert_old_parameters(&conversion_table[0], ARRAY_SIZE(conversion_table));
-        cliSerial->printf_P(PSTR("load_all took %luus\n"), micros() - before);
+        cliSerial->printf("load_all took %uus\n", micros() - before);
     }
 }

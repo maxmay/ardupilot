@@ -16,11 +16,12 @@
 
 #include "AP_RPM.h"
 #include "RPM_PX4_PWM.h"
+#include "RPM_SITL.h"
 
 extern const AP_HAL::HAL& hal;
 
 // table of user settable parameters
-const AP_Param::GroupInfo AP_RPM::var_info[] PROGMEM = {
+const AP_Param::GroupInfo AP_RPM::var_info[] = {
     // @Param: _TYPE
     // @DisplayName: RPM type
     // @Description: What type of RPM sensor is connected
@@ -85,6 +86,11 @@ void AP_RPM::init(void)
             drivers[instance] = new AP_RPM_PX4_PWM(*this, instance, state[instance]);
         }
 #endif
+#if CONFIG_HAL_BOARD == HAL_BOARD_SITL
+        uint8_t instance = num_instances;
+        state[instance].instance = instance;
+        drivers[instance] = new AP_RPM_SITL(*this, instance, state[instance]);
+#endif
         if (drivers[i] != NULL) {
             // we loaded a driver for this instance, so it must be
             // present (although it may not be healthy)
@@ -118,7 +124,7 @@ bool AP_RPM::healthy(uint8_t instance) const
         return false;
     }
     // assume we get readings at at least 1Hz
-    if (hal.scheduler->millis() - state[instance].last_reading_ms > 1000) {
+    if (AP_HAL::millis() - state[instance].last_reading_ms > 1000) {
         return false;
     }
     return true;

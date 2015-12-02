@@ -6,7 +6,7 @@
 
 extern const AP_HAL::HAL& hal;
 
-const AP_Param::GroupInfo AP_BattMonitor::var_info[] PROGMEM = {
+const AP_Param::GroupInfo AP_BattMonitor::var_info[] = {
     // @Param: _MONITOR
     // @DisplayName: Battery monitoring
     // @Description: Controls enabling monitoring of the battery's voltage and current
@@ -276,7 +276,7 @@ bool AP_BattMonitor::exhausted(uint8_t instance, float low_voltage, float min_ca
     }
 
     // get current time
-    uint32_t tnow = hal.scheduler->millis();
+    uint32_t tnow = AP_HAL::millis();
 
     // check voltage
     if ((state[instance].voltage > 0.0f) && (low_voltage > 0) && (state[instance].voltage < low_voltage)) {

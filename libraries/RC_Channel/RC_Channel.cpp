@@ -31,11 +31,10 @@ extern const AP_HAL::HAL& hal;
 #include "RC_Channel.h"
 
 /// global array with pointers to all APM RC channels, will be used by AP_Mount
-/// and AP_Camera classes / It points to RC input channels, both APM1 and APM2
-/// only have 8 input channels.
+/// and AP_Camera classes / It points to RC input channels.
 RC_Channel *RC_Channel::rc_ch[RC_MAX_CHANNELS];
 
-const AP_Param::GroupInfo RC_Channel::var_info[] PROGMEM = {
+const AP_Param::GroupInfo RC_Channel::var_info[] = {
     // @Param: MIN
     // @DisplayName: RC min PWM
     // @Description: RC minimum PWM pulse width. Typically 1000 is lower limit, 1500 is neutral and 2000 is upper limit.
@@ -114,9 +113,7 @@ RC_Channel::set_angle(int16_t angle)
 void
 RC_Channel::set_default_dead_zone(int16_t dzone)
 {
-    if (!_dead_zone.load()) {
-        _dead_zone.set(abs(dzone));
-    }
+    _dead_zone.set_default(abs(dzone));
 }
 
 void
@@ -273,8 +270,8 @@ RC_Channel::zero_min_max()
 void
 RC_Channel::update_min_max()
 {
-    radio_min = min(radio_min.get(), radio_in);
-    radio_max = max(radio_max.get(), radio_in);
+    radio_min = MIN(radio_min.get(), radio_in);
+    radio_max = MAX(radio_max.get(), radio_in);
 }
 
 /*
@@ -373,8 +370,14 @@ RC_Channel::norm_input()
     float ret;
     int16_t reverse_mul = (_reverse==-1?-1:1);
     if (radio_in < radio_trim) {
+        if (radio_min >= radio_trim) {
+            return 0.0f;
+        }
         ret = reverse_mul * (float)(radio_in - radio_trim) / (float)(radio_trim - radio_min);
     } else {
+        if (radio_max <= radio_trim) {
+            return 0.0f;
+        }
         ret = reverse_mul * (float)(radio_in - radio_trim) / (float)(radio_max  - radio_trim);
     }
     return constrain_float(ret, -1.0f, 1.0f);
@@ -513,4 +516,12 @@ uint16_t RC_Channel::get_limit_pwm(LimitValue limit) const
     }
     // invalid limit value, return trim
     return radio_trim;
+}
+
+/*
+  Return true if the channel is at trim and within the DZ
+*/
+bool RC_Channel::in_trim_dz()
+{
+    return is_bounded_int32(radio_in, radio_trim - _dead_zone, radio_trim + _dead_zone);
 }

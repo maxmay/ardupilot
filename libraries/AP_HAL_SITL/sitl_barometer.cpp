@@ -43,8 +43,8 @@ void SITL_State::_update_barometer(float altitude)
         return;
     }
 
-    // 80Hz, to match the real APM2 barometer
-    uint32_t now = hal.scheduler->millis();
+    // 80Hz
+    uint32_t now = AP_HAL::millis();
     if ((now - last_update) < 12) {
         return;
     }

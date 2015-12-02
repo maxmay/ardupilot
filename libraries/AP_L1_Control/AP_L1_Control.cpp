@@ -6,7 +6,7 @@
 extern const AP_HAL::HAL& hal;
 
 // table of user settable parameters
-const AP_Param::GroupInfo AP_L1_Control::var_info[] PROGMEM = {
+const AP_Param::GroupInfo AP_L1_Control::var_info[] = {
     // @Param: PERIOD
     // @DisplayName: L1 control period
     // @Description: Period in seconds of L1 tracking loop. This parameter is the primary control for agressiveness of turns in auto mode. This needs to be larger for less responsive airframes. The default of 20 is quite conservative, but for most RC aircraft will lead to reasonable flight. For smaller more agile aircraft a value closer to 15 is appropriate, or even as low as 10 for some very agile aircraft. When tuning, change this value in small increments, as a value that is much too small (say 5 or 10 below the right value) can lead to very radical turns, and a risk of stalling.
@@ -83,7 +83,7 @@ int32_t AP_L1_Control::target_bearing_cd(void) const
 float AP_L1_Control::turn_distance(float wp_radius) const
 {
     wp_radius *= sq(_ahrs.get_EAS2TAS());
-	return min(wp_radius, _L1_dist);
+	return MIN(wp_radius, _L1_dist);
 }
 
 /*
@@ -135,7 +135,6 @@ void AP_L1_Control::_prevent_indecision(float &Nu)
 }
 
 // update L1 control for waypoint navigation
-// this function costs about 3.5 milliseconds on a AVR2560
 void AP_L1_Control::update_waypoint(const struct Location &prev_WP, const struct Location &next_WP)
 {
 
@@ -193,7 +192,7 @@ void AP_L1_Control::update_waypoint(const struct Location &prev_WP, const struct
 		//Otherwise do normal L1 guidance
 	float WP_A_dist = A_air.length();
 	float alongTrackDist = A_air * AB;
-	if (WP_A_dist > _L1_dist && alongTrackDist/max(WP_A_dist, 1.0f) < -0.7071f) 
+	if (WP_A_dist > _L1_dist && alongTrackDist/MAX(WP_A_dist, 1.0f) < -0.7071f) 
     {
 		//Calc Nu to fly To WP A
 		Vector2f A_air_unit = (A_air).normalized(); // Unit vector from WP A to aircraft
@@ -209,7 +208,7 @@ void AP_L1_Control::update_waypoint(const struct Location &prev_WP, const struct
 		ltrackVel = _groundspeed_vector * AB; // Velocity along track
 		float Nu2 = atan2f(xtrackVel,ltrackVel);
 		//Calculate Nu1 angle (Angle to L1 reference point)
-		float sine_Nu1 = _crosstrack_error/max(_L1_dist, 0.1f);
+		float sine_Nu1 = _crosstrack_error/MAX(_L1_dist, 0.1f);
 		//Limit sine of Nu1 to provide a controlled track capture angle of 45 deg
 		sine_Nu1 = constrain_float(sine_Nu1, -0.7071f, 0.7071f);
 		float Nu1 = asinf(sine_Nu1);
@@ -272,7 +271,7 @@ void AP_L1_Control::update_loiter(const struct Location &center_WP, float radius
 	Vector2f _groundspeed_vector = _ahrs.groundspeed_vector();
 
 	//Calculate groundspeed
-	float groundSpeed = max(_groundspeed_vector.length() , 1.0f);
+	float groundSpeed = MAX(_groundspeed_vector.length() , 1.0f);
 
 
 	// update _target_bearing_cd
@@ -330,11 +329,11 @@ void AP_L1_Control::update_loiter(const struct Location &center_WP, float radius
 	
     //Prevent PD demand from turning the wrong way by limiting the command when flying the wrong way
     if (ltrackVelCap < 0.0f && velTangent < 0.0f) {
-        latAccDemCircPD =  max(latAccDemCircPD, 0.0f);
+        latAccDemCircPD =  MAX(latAccDemCircPD, 0.0f);
 	}
 	
 	// Calculate centripetal acceleration demand
-	float latAccDemCircCtr = velTangent * velTangent / max((0.5f * radius), (radius + xtrackErrCirc));
+	float latAccDemCircCtr = velTangent * velTangent / MAX((0.5f * radius), (radius + xtrackErrCirc));
 
 	//Sum PD control and centripetal acceleration to calculate lateral manoeuvre demand
 	float latAccDemCirc = loiter_direction * (latAccDemCircPD + latAccDemCircCtr);

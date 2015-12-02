@@ -58,6 +58,10 @@ JSBSim::JSBSim(const char *home_str, const char *frame_str) :
     } else {
         frame = FRAME_NORMAL;
     }
+    const char *model_name = strchr(frame_str, ':');
+    if (model_name != NULL) {
+        jsbsim_model = model_name + 1;
+    }
 }
 
 /*
@@ -76,20 +80,20 @@ bool JSBSim::create_templates(void)
 
     FILE *f = fopen(jsbsim_script, "w");
     if (f == NULL) {
-        hal.scheduler->panic("Unable to create jsbsim script");
+        AP_HAL::panic("Unable to create jsbsim script %s", jsbsim_script);
     }
     fprintf(f,
 "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
 "<?xml-stylesheet type=\"text/xsl\" href=\"http://jsbsim.sf.net/JSBSimScript.xsl\"?>\n"
 "<runscript xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"\n"
 "    xsi:noNamespaceSchemaLocation=\"http://jsbsim.sf.net/JSBSimScript.xsd\"\n"
-"    name=\"Testing Rascal110\">\n"
+"    name=\"Testing %s\">\n"
 "\n"
 "  <description>\n"
-"    test ArduPlane using Rascal110 and JSBSim\n"
+"    test ArduPlane using %s and JSBSim\n"
 "  </description>\n"
 "\n"
-"  <use aircraft=\"Rascal\" initialize=\"reset\"/>\n"
+"  <use aircraft=\"%s\" initialize=\"reset\"/>\n"
 "\n"
 "  <!-- we control the servos via the jsbsim console\n"
 "       interface on TCP 5124 -->\n"
@@ -112,12 +116,16 @@ bool JSBSim::create_templates(void)
 "  </run>\n"
 "\n"
 "</runscript>\n"
-"", control_port);
+"",
+            jsbsim_model,
+            jsbsim_model,
+            jsbsim_model,
+            control_port);
     fclose(f);
 
     f = fopen(jsbsim_fgout, "w");
     if (f == NULL) {
-        hal.scheduler->panic("Unable to create jsbsim fgout script");
+        AP_HAL::panic("Unable to create jsbsim fgout script %s", jsbsim_fgout);
     }
     fprintf(f, "<?xml version=\"1.0\"?>\n"
             "<output name=\"127.0.0.1\" type=\"FLIGHTGEAR\" port=\"%u\" protocol=\"udp\" rate=\"1000\"/>\n",
@@ -125,10 +133,10 @@ bool JSBSim::create_templates(void)
     fclose(f);
 
     char *jsbsim_reset;
-    asprintf(&jsbsim_reset, "%s/aircraft/Rascal/reset.xml", autotest_dir);
+    asprintf(&jsbsim_reset, "%s/aircraft/%s/reset.xml", autotest_dir, jsbsim_model);
     f = fopen(jsbsim_reset, "w");
     if (f == NULL) {
-        hal.scheduler->panic("Unable to create jsbsim Rascal reset script");
+        AP_HAL::panic("Unable to create jsbsim reset script %s", jsbsim_reset);
     }
     float r, p, y;
     dcm.to_euler(&r, &p, &y);
@@ -169,7 +177,7 @@ bool JSBSim::start_JSBSim(void)
     int p[2];
     int devnull = open("/dev/null", O_RDWR);
     if (pipe(p) != 0) {
-        hal.scheduler->panic("Unable to create pipe");
+        AP_HAL::panic("Unable to create pipe");
     }
     pid_t child_pid = fork();
     if (child_pid == 0) {
@@ -211,14 +219,14 @@ bool JSBSim::start_JSBSim(void)
     // read startup to be sure it is running
     char c;
     if (read(jsbsim_stdout, &c, 1) != 1) {
-        hal.scheduler->panic("Unable to start JSBSim");
+        AP_HAL::panic("Unable to start JSBSim");
     }
 
     if (!expect("JSBSim Execution beginning")) {
-        hal.scheduler->panic("Failed to start JSBSim");
+        AP_HAL::panic("Failed to start JSBSim");
     }
     if (!open_control_socket()) {
-        hal.scheduler->panic("Failed to open JSBSim control socket");
+        AP_HAL::panic("Failed to open JSBSim control socket");
     }
 
     fcntl(jsbsim_stdout, F_SETFL, fcntl(jsbsim_stdout, F_GETFL, 0) | O_NONBLOCK);
@@ -413,6 +421,9 @@ void JSBSim::recv_fdm(const struct sitl_input &input)
     dcm.from_euler(fdm.phi, fdm.theta, fdm.psi);
     airspeed = fdm.vcas * FEET_TO_METERS;
 
+    rpm1 = fdm.rpm[0];
+    rpm2 = fdm.rpm[1];
+    
     // assume 1kHz for now
     time_now_us += 1000;
 }

@@ -247,8 +247,9 @@ bool Copter::autotune_start(bool ignore_checks)
     pos_control.set_speed_z(-g.pilot_velocity_z_max, g.pilot_velocity_z_max);
     pos_control.set_accel_z(g.pilot_accel_z);
 
-    // initialise altitude target to stopping point
-    pos_control.set_target_to_stopping_point_z();
+    // initialise position and desired velocity
+    pos_control.set_alt_target(inertial_nav.get_altitude());
+    pos_control.set_desired_velocity_z(inertial_nav.get_velocity_z());
 
     return true;
 }
@@ -260,6 +261,10 @@ void Copter::autotune_run()
     float target_roll, target_pitch;
     float target_yaw_rate;
     int16_t target_climb_rate;
+
+    // initialize vertical speeds and acceleration
+    pos_control.set_speed_z(-g.pilot_velocity_z_max, g.pilot_velocity_z_max);
+    pos_control.set_accel_z(g.pilot_accel_z);
 
     // if not auto armed or motor interlock not enabled set throttle to zero and exit immediately
     // this should not actually be possible because of the autotune_init() checks
@@ -325,7 +330,7 @@ void Copter::autotune_run()
         }
 
         // call position controller
-        pos_control.set_alt_target_from_climb_rate(target_climb_rate, G_Dt, false);
+        pos_control.set_alt_target_from_climb_rate_ff(target_climb_rate, G_Dt, false);
         pos_control.update_z_controller();
     }
 }
@@ -634,16 +639,16 @@ void Copter::autotune_attitude_control()
                 autotune_state.tune_type = AutoTuneTuneType(autotune_state.tune_type + 1);
                 switch (autotune_state.axis) {
                 case AUTOTUNE_AXIS_ROLL:
-                    tune_roll_rd = max(g.autotune_min_d, tune_roll_rd * AUTOTUNE_RD_BACKOFF);
-                    tune_roll_rp = max(AUTOTUNE_RP_MIN, tune_roll_rp * AUTOTUNE_RD_BACKOFF);
+                    tune_roll_rd = MAX(g.autotune_min_d, tune_roll_rd * AUTOTUNE_RD_BACKOFF);
+                    tune_roll_rp = MAX(AUTOTUNE_RP_MIN, tune_roll_rp * AUTOTUNE_RD_BACKOFF);
                     break;
                 case AUTOTUNE_AXIS_PITCH:
-                    tune_pitch_rd = max(g.autotune_min_d, tune_pitch_rd * AUTOTUNE_RD_BACKOFF);
-                    tune_pitch_rp = max(AUTOTUNE_RP_MIN, tune_pitch_rp * AUTOTUNE_RD_BACKOFF);
+                    tune_pitch_rd = MAX(g.autotune_min_d, tune_pitch_rd * AUTOTUNE_RD_BACKOFF);
+                    tune_pitch_rp = MAX(AUTOTUNE_RP_MIN, tune_pitch_rp * AUTOTUNE_RD_BACKOFF);
                     break;
                 case AUTOTUNE_AXIS_YAW:
-                    tune_yaw_rLPF = max(AUTOTUNE_RLPF_MIN, tune_yaw_rLPF * AUTOTUNE_RD_BACKOFF);
-                    tune_yaw_rp = max(AUTOTUNE_RP_MIN, tune_yaw_rp * AUTOTUNE_RD_BACKOFF);
+                    tune_yaw_rLPF = MAX(AUTOTUNE_RLPF_MIN, tune_yaw_rLPF * AUTOTUNE_RD_BACKOFF);
+                    tune_yaw_rp = MAX(AUTOTUNE_RP_MIN, tune_yaw_rp * AUTOTUNE_RD_BACKOFF);
                     break;
                 }
                 break;
@@ -651,13 +656,13 @@ void Copter::autotune_attitude_control()
                 autotune_state.tune_type = AutoTuneTuneType(autotune_state.tune_type + 1);
                 switch (autotune_state.axis) {
                 case AUTOTUNE_AXIS_ROLL:
-                    tune_roll_rp = max(AUTOTUNE_RP_MIN, tune_roll_rp * AUTOTUNE_RP_BACKOFF);
+                    tune_roll_rp = MAX(AUTOTUNE_RP_MIN, tune_roll_rp * AUTOTUNE_RP_BACKOFF);
                     break;
                 case AUTOTUNE_AXIS_PITCH:
-                    tune_pitch_rp = max(AUTOTUNE_RP_MIN, tune_pitch_rp * AUTOTUNE_RP_BACKOFF);
+                    tune_pitch_rp = MAX(AUTOTUNE_RP_MIN, tune_pitch_rp * AUTOTUNE_RP_BACKOFF);
                     break;
                 case AUTOTUNE_AXIS_YAW:
-                    tune_yaw_rp = max(AUTOTUNE_RP_MIN, tune_yaw_rp * AUTOTUNE_RP_BACKOFF);
+                    tune_yaw_rp = MAX(AUTOTUNE_RP_MIN, tune_yaw_rp * AUTOTUNE_RP_BACKOFF);
                     break;
                 }
                 break;
@@ -672,8 +677,8 @@ void Copter::autotune_attitude_control()
                 bool autotune_complete = false;
                 switch (autotune_state.axis) {
                 case AUTOTUNE_AXIS_ROLL:
-                    tune_roll_sp = max(AUTOTUNE_SP_MIN, tune_roll_sp * AUTOTUNE_SP_BACKOFF);
-                    tune_roll_accel = max(AUTOTUNE_RP_ACCEL_MIN, autotune_test_accel_max * AUTOTUNE_ACCEL_RP_BACKOFF);
+                    tune_roll_sp = MAX(AUTOTUNE_SP_MIN, tune_roll_sp * AUTOTUNE_SP_BACKOFF);
+                    tune_roll_accel = MAX(AUTOTUNE_RP_ACCEL_MIN, autotune_test_accel_max * AUTOTUNE_ACCEL_RP_BACKOFF);
                     if (autotune_pitch_enabled()) {
                         autotune_state.axis = AUTOTUNE_AXIS_PITCH;
                     } else if (autotune_yaw_enabled()) {
@@ -683,8 +688,8 @@ void Copter::autotune_attitude_control()
                     }
                     break;
                 case AUTOTUNE_AXIS_PITCH:
-                    tune_pitch_sp = max(AUTOTUNE_SP_MIN, tune_pitch_sp * AUTOTUNE_SP_BACKOFF);
-                    tune_pitch_accel = max(AUTOTUNE_RP_ACCEL_MIN, autotune_test_accel_max * AUTOTUNE_ACCEL_RP_BACKOFF);
+                    tune_pitch_sp = MAX(AUTOTUNE_SP_MIN, tune_pitch_sp * AUTOTUNE_SP_BACKOFF);
+                    tune_pitch_accel = MAX(AUTOTUNE_RP_ACCEL_MIN, autotune_test_accel_max * AUTOTUNE_ACCEL_RP_BACKOFF);
                     if (autotune_yaw_enabled()) {
                         autotune_state.axis = AUTOTUNE_AXIS_YAW;
                     } else {
@@ -692,8 +697,8 @@ void Copter::autotune_attitude_control()
                     }
                     break;
                 case AUTOTUNE_AXIS_YAW:
-                    tune_yaw_sp = max(AUTOTUNE_SP_MIN, tune_yaw_sp * AUTOTUNE_SP_BACKOFF);
-                    tune_yaw_accel = max(AUTOTUNE_Y_ACCEL_MIN, autotune_test_accel_max * AUTOTUNE_ACCEL_Y_BACKOFF);
+                    tune_yaw_sp = MAX(AUTOTUNE_SP_MIN, tune_yaw_sp * AUTOTUNE_SP_BACKOFF);
+                    tune_yaw_accel = MAX(AUTOTUNE_Y_ACCEL_MIN, autotune_test_accel_max * AUTOTUNE_ACCEL_Y_BACKOFF);
                     autotune_complete = true;
                     break;
                 }
@@ -1006,19 +1011,19 @@ void Copter::autotune_update_gcs(uint8_t message_id)
 {
     switch (message_id) {
         case AUTOTUNE_MESSAGE_STARTED:
-            gcs_send_text_P(MAV_SEVERITY_CRITICAL,PSTR("AutoTune: Started"));
+            gcs_send_text(MAV_SEVERITY_INFO,"AutoTune: Started");
             break;
         case AUTOTUNE_MESSAGE_STOPPED:
-            gcs_send_text_P(MAV_SEVERITY_CRITICAL,PSTR("AutoTune: Stopped"));
+            gcs_send_text(MAV_SEVERITY_INFO,"AutoTune: Stopped");
             break;
         case AUTOTUNE_MESSAGE_SUCCESS:
-            gcs_send_text_P(MAV_SEVERITY_CRITICAL,PSTR("AutoTune: Success"));
+            gcs_send_text(MAV_SEVERITY_INFO,"AutoTune: Success");
             break;
         case AUTOTUNE_MESSAGE_FAILED:
-            gcs_send_text_P(MAV_SEVERITY_CRITICAL,PSTR("AutoTune: Failed"));
+            gcs_send_text(MAV_SEVERITY_NOTICE,"AutoTune: Failed");
             break;
         case AUTOTUNE_MESSAGE_SAVED_GAINS:
-            gcs_send_text_P(MAV_SEVERITY_CRITICAL,PSTR("AutoTune: Saved Gains"));
+            gcs_send_text(MAV_SEVERITY_INFO,"AutoTune: Saved gains");
             break;
     }
 }
@@ -1057,7 +1062,7 @@ void Copter::autotune_twitching_test(float measurement, float target, float &mea
     if (measurement_max < target * 0.75f) {
         // the measurement not reached the 90% threshold yet
         autotune_step_stop_time = autotune_step_start_time + (millis() - autotune_step_start_time) * 3.0f;
-        autotune_step_stop_time = min(autotune_step_stop_time, autotune_step_start_time + AUTOTUNE_TESTING_STEP_TIMEOUT_MS);
+        autotune_step_stop_time = MIN(autotune_step_stop_time, autotune_step_start_time + AUTOTUNE_TESTING_STEP_TIMEOUT_MS);
     }
 
     if (measurement_max > target) {

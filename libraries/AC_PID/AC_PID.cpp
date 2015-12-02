@@ -6,7 +6,7 @@
 #include <AP_Math/AP_Math.h>
 #include "AC_PID.h"
 
-const AP_Param::GroupInfo AC_PID::var_info[] PROGMEM = {
+const AP_Param::GroupInfo AC_PID::var_info[] = {
     // @Param: P
     // @DisplayName: PID Proportional Gain
     // @Description: P Gain which produces an output value that is proportional to the current error value
@@ -74,7 +74,7 @@ void AC_PID::filt_hz(float hz)
     _filt_hz.set(fabsf(hz));
 
     // sanity check _filt_hz
-    _filt_hz = max(_filt_hz, AC_PID_FILT_HZ_MIN);
+    _filt_hz = MAX(_filt_hz, AC_PID_FILT_HZ_MIN);
 }
 
 // set_input_filter_all - set input to PID controller

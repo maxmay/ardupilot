@@ -113,6 +113,7 @@ void Copter::guided_posvel_control_start()
     // set speed and acceleration from wpnav's speed and acceleration
     pos_control.set_speed_xy(wp_nav.get_speed_xy());
     pos_control.set_accel_xy(wp_nav.get_wp_acceleration());
+    pos_control.set_jerk_xy_to_default();
 
     const Vector3f& curr_pos = inertial_nav.get_position();
     const Vector3f& curr_vel = inertial_nav.get_velocity();
@@ -139,8 +140,9 @@ void Copter::guided_angle_control_start()
     pos_control.set_speed_z(wp_nav.get_speed_down(), wp_nav.get_speed_up());
     pos_control.set_accel_z(wp_nav.get_accel_z());
 
-    // initialise altitude target to stopping point
-    pos_control.set_target_to_stopping_point_z();
+    // initialise position and desired velocity
+    pos_control.set_alt_target(inertial_nav.get_altitude());
+    pos_control.set_desired_velocity_z(inertial_nav.get_velocity_z());
 
     // initialise targets
     guided_angle_state.update_time_ms = millis();
@@ -353,19 +355,8 @@ void Copter::guided_vel_control_run()
         pos_control.set_desired_velocity(Vector3f(0,0,0));
     }
 
-    // calculate dt
-    float dt = pos_control.time_since_last_xy_update();
-
-    // update at poscontrol update rate
-    if (dt >= pos_control.get_dt_xy()) {
-        // sanity check dt
-        if (dt >= 0.2f) {
-            dt = 0.0f;
-        }
-
-        // call velocity controller which includes z axis controller
-        pos_control.update_vel_controller_xyz(ekfNavVelGainScaler);
-    }
+    // call velocity controller which includes z axis controller
+    pos_control.update_vel_controller_xyz(ekfNavVelGainScaler);
 
     // call attitude controller
     if (auto_yaw_mode == AUTO_YAW_HOLD) {
@@ -468,7 +459,7 @@ void Copter::guided_angle_control_run()
     float roll_in = guided_angle_state.roll_cd;
     float pitch_in = guided_angle_state.pitch_cd;
     float total_in = pythagorous2(roll_in, pitch_in);
-    float angle_max = min(attitude_control.get_althold_lean_angle_max(), aparm.angle_max);
+    float angle_max = MIN(attitude_control.get_althold_lean_angle_max(), aparm.angle_max);
     if (total_in > angle_max) {
         float ratio = angle_max / total_in;
         roll_in *= ratio;
@@ -493,7 +484,7 @@ void Copter::guided_angle_control_run()
     attitude_control.angle_ef_roll_pitch_yaw(roll_in, pitch_in, yaw_in, true);
 
     // call position controller
-    pos_control.set_alt_target_from_climb_rate(climb_rate_cms, G_Dt, false);
+    pos_control.set_alt_target_from_climb_rate_ff(climb_rate_cms, G_Dt, false);
     pos_control.update_z_controller();
 }
 
@@ -522,7 +513,7 @@ void Copter::guided_limit_set(uint32_t timeout_ms, float alt_min_cm, float alt_m
 void Copter::guided_limit_init_time_and_pos()
 {
     // initialise start time
-    guided_limit.start_time = hal.scheduler->millis();
+    guided_limit.start_time = AP_HAL::millis();
 
     // initialise start position from current position
     guided_limit.start_pos = inertial_nav.get_position();

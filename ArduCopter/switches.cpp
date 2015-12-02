@@ -244,14 +244,9 @@ void Copter::init_aux_switch_function(int8_t ch_option, uint8_t ch_flag)
         case AUXSW_RELAY:
         case AUXSW_LANDING_GEAR:
         case AUXSW_MOTOR_ESTOP:
-            do_aux_switch_function(ch_option, ch_flag);
-            break;
-
         case AUXSW_MOTOR_INTERLOCK:
-            set_using_interlock(check_if_auxsw_mode_used(AUXSW_MOTOR_INTERLOCK));
             do_aux_switch_function(ch_option, ch_flag);
             break;
-            
     }
 }
 
@@ -320,7 +315,7 @@ void Copter::do_aux_switch_function(int8_t ch_function, uint8_t ch_flag)
                     cmd.p1 = 0;
                     cmd.content.location.lat = 0;
                     cmd.content.location.lng = 0;
-                    cmd.content.location.alt = max(current_loc.alt,100);
+                    cmd.content.location.alt = MAX(current_loc.alt,100);
 
                     // use the current altitude for the target alt for takeoff.
                     // only altitude will matter to the AP mission script for takeoff.
@@ -597,7 +592,7 @@ void Copter::save_trim()
     float pitch_trim = ToRad((float)channel_pitch->control_in/100.0f);
     ahrs.add_trim(roll_trim, pitch_trim);
     Log_Write_Event(DATA_SAVE_TRIM);
-    gcs_send_text_P(MAV_SEVERITY_CRITICAL, PSTR("Trim saved"));
+    gcs_send_text(MAV_SEVERITY_INFO, "Trim saved");
 }
 
 // auto_trim - slightly adjusts the ahrs.roll_trim and ahrs.pitch_trim towards the current stick positions
