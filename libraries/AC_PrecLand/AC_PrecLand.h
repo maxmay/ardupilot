@@ -57,6 +57,8 @@ public:
     // get_target_shift - returns 3D vector of earth-frame position adjustments to target
     Vector3f get_target_shift(const Vector3f& orig_target);
 
+    void calc_angles_and_pos_out(float alt_above_terrain_cm, float &bf_target_pos_offset_roll, float &bf_target_pos_offset_pitch);
+
     // handle_msg - Process a LANDING_TARGET mavlink message
     void handle_msg(mavlink_message_t* msg);
 

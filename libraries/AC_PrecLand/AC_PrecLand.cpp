@@ -169,6 +169,60 @@ void AC_PrecLand::calc_angles_and_pos(float alt_above_terrain_cm)
     _have_estimate = true;
 }
 
+// calc_angles_and_pos - reports back bf target pos
+//  converts sensor's body-frame angles to earth-frame angles and position estimate
+//  raw sensor angles stored in _angle_to_target (might be in earth frame, or maybe body frame)
+//  earth-frame angles stored in _ef_angle_to_target
+//  position estimate is stored in _target_pos
+void AC_PrecLand::calc_angles_and_pos_out(float alt_above_terrain_cm, float &ef_target_pos_offset_roll, float &ef_target_pos_offset_pitch)
+{
+    // exit immediately if not enabled
+    if (_backend == NULL) {
+        _have_estimate = false;
+        return;
+    }
+
+    // get angles to target from backend
+    if (!_backend->get_angle_to_target(_angle_to_target.x, _angle_to_target.y)) {
+        _have_estimate = false;
+        return;
+    }
+
+    float x_rad;
+    float y_rad;
+
+    if(_backend->get_frame_of_reference() == MAV_FRAME_LOCAL_NED){
+        //don't subtract vehicle lean angles
+        x_rad = _angle_to_target.x;
+        y_rad = -_angle_to_target.y;
+    }else{ // assume MAV_FRAME_BODY_NED (i.e. a hard-mounted sensor)
+        // subtract vehicle lean angles
+        x_rad = _angle_to_target.x - _ahrs.roll;
+        y_rad = -_angle_to_target.y + _ahrs.pitch;
+    }
+
+    // rotate to earth-frame angles
+    _ef_angle_to_target.x = y_rad*_ahrs.cos_yaw() - x_rad*_ahrs.sin_yaw();
+    _ef_angle_to_target.y = y_rad*_ahrs.sin_yaw() + x_rad*_ahrs.cos_yaw();
+
+
+    // get current altitude (constrained to no lower than 50cm)
+    float alt = MAX(alt_above_terrain_cm, 50.0f);
+
+
+    // convert earth-frame angles to earth-frame position offset
+    _target_pos_offset.x = alt*tanf(_ef_angle_to_target.x);
+    _target_pos_offset.y = alt*tanf(_ef_angle_to_target.y);
+    _target_pos_offset.z = 0;  // not used
+
+    // OUTPUT
+    ef_target_pos_offset_roll = alt*tanf(_ef_angle_to_target.x);
+    ef_target_pos_offset_pitch = alt*tanf(_ef_angle_to_target.y);
+
+
+    _have_estimate = true;
+}
+
 // handle_msg - Process a LANDING_TARGET mavlink message
 void AC_PrecLand::handle_msg(mavlink_message_t* msg)
 {
