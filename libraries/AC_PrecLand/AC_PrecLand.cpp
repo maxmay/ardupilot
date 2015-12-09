@@ -174,7 +174,7 @@ void AC_PrecLand::calc_angles_and_pos(float alt_above_terrain_cm)
 //  raw sensor angles stored in _angle_to_target (might be in earth frame, or maybe body frame)
 //  earth-frame angles stored in _ef_angle_to_target
 //  position estimate is stored in _target_pos
-void AC_PrecLand::calc_angles_and_pos_out(float alt_above_terrain_cm, float &ef_target_pos_offset_roll, float &ef_target_pos_offset_pitch)
+void AC_PrecLand::calc_angles_and_pos_out(float alt_above_terrain_cm, float &ef_target_pos_offset_x, float &ef_target_pos_offset_y)
 {
     // exit immediately if not enabled
     if (_backend == NULL) {
@@ -216,8 +216,8 @@ void AC_PrecLand::calc_angles_and_pos_out(float alt_above_terrain_cm, float &ef_
     _target_pos_offset.z = 0;  // not used
 
     // OUTPUT
-    ef_target_pos_offset_roll = alt*tanf(_ef_angle_to_target.x);
-    ef_target_pos_offset_pitch = alt*tanf(_ef_angle_to_target.y);
+    ef_target_pos_offset_x = alt*tanf(x_rad);
+    ef_target_pos_offset_y = alt*tanf(y_rad);
 
 
     _have_estimate = true;

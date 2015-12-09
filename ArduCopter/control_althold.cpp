@@ -43,17 +43,20 @@ void Copter::althold_run()
     update_simple_mode();
 
     // GET target positions in earth-frame coordinates (cm)
-    float ef_target_pos_offset_roll, ef_target_pos_offset_pitch;
+    float ef_target_pos_offset_x, ef_target_pos_offset_y;
     if (sonar_enabled && (sonar_alt_health >= SONAR_ALT_HEALTH_MAX)) {
         // if sonar is ok, use surface tracking
-    	precland.calc_angles_and_pos_out(sonar_alt, ef_target_pos_offset_roll, ef_target_pos_offset_pitch);
+    	precland.calc_angles_and_pos_out(sonar_alt, ef_target_pos_offset_x, ef_target_pos_offset_y);
     } else {
-    	precland.calc_angles_and_pos_out(current_loc.alt, ef_target_pos_offset_roll, ef_target_pos_offset_pitch);
+    	precland.calc_angles_and_pos_out(current_loc.alt, ef_target_pos_offset_x, ef_target_pos_offset_y);
     }
 
     // RUN P controller
-    u_ctrl_roll = Pgain*ef_target_pos_offset_pitch;
-    u_ctrl_pitch = -Pgain*ef_target_pos_offset_roll;
+    u_ctrl_roll = Pgain*ef_target_pos_offset_x;
+    u_ctrl_pitch = -Pgain*ef_target_pos_offset_y;
+    /* PROVIDING angle_ef_roll_pitch_rate_ef_yaw() with roll = -1000, pitch = -1500, yaw = 500 means
+    lean the vehicle left to 10degrees, pitch forward to 15degrees and rotate right
+    at 5deg/second. */
 
     // IF pilot overrides by applying pitch/roll
    	float target_roll, target_pitch;
