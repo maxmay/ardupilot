@@ -48,6 +48,9 @@ public:
     // init - perform any required initialisation of landing controllers
     void init();
 
+    // INITIALIZE
+    void set_initial_vals();
+
     // healthy - returns true if precision landing is healthy
     bool healthy() { return _backend_state.healthy; }
 
@@ -57,7 +60,7 @@ public:
     // get_target_shift - returns 3D vector of earth-frame position adjustments to target
     Vector3f get_target_shift(const Vector3f& orig_target);
 
-    void calc_angles_and_pos_out(float alt_above_terrain_cm, float &bf_target_pos_offset_roll, float &bf_target_pos_offset_pitch);
+    const Vector3f& calc_angles_and_pos_out(float alt_above_terrain_cm);
 
     // handle_msg - Process a LANDING_TARGET mavlink message
     void handle_msg(mavlink_message_t* msg);
@@ -102,6 +105,12 @@ private:
     // output from controller
     bool                        _have_estimate;     // true if we have a recent estimated position offset
     Vector3f                    _target_pos_offset; // estimate target position offset from vehicle in earth-frame
+    float                    _prev_bf_roll_pos_offset;
+    float                    _prev_bf_pitch_pos_offset;
+    uint32_t                 _missed_target_frames;
+
+    // output from controller
+    Vector3f                    _desired_vel;       // desired velocity towards target in earth-frame
 
     // backend state
     struct precland_state {

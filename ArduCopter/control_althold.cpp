@@ -20,6 +20,9 @@ bool Copter::althold_init(bool ignore_checks)
     // stop takeoff if running
     takeoff_stop();
 
+    // INITIALISE
+    precland.set_initial_vals();
+
     return true;
 }
 
@@ -30,9 +33,6 @@ void Copter::althold_run()
     AltHoldModeState althold_state;
     float takeoff_climb_rate = 0.0f;
 
-    float Pgain = 2;
-    float u_ctrl_roll;
-    float u_ctrl_pitch;
     float limit_rollpitch = 1500; //centi-degrees
 
     // initialize vertical speeds and acceleration
@@ -42,21 +42,17 @@ void Copter::althold_run()
     // apply SIMPLE mode transform to pilot inputs
     update_simple_mode();
 
-    // GET target positions in earth-frame coordinates (cm)
-    float ef_target_pos_offset_x, ef_target_pos_offset_y;
+    // NEW METHOD
+    float u_ctrl_roll, u_ctrl_pitch;
+    Vector3f desval;
     if (sonar_enabled && (sonar_alt_health >= SONAR_ALT_HEALTH_MAX)) {
         // if sonar is ok, use surface tracking
-    	precland.calc_angles_and_pos_out(sonar_alt, ef_target_pos_offset_x, ef_target_pos_offset_y);
+    	desval = precland.calc_angles_and_pos_out(sonar_alt);
     } else {
-    	precland.calc_angles_and_pos_out(current_loc.alt, ef_target_pos_offset_x, ef_target_pos_offset_y);
+    	desval = precland.calc_angles_and_pos_out(current_loc.alt);
     }
-
-    // RUN P controller
-    u_ctrl_roll = Pgain*ef_target_pos_offset_x;
-    u_ctrl_pitch = -Pgain*ef_target_pos_offset_y;
-    /* PROVIDING angle_ef_roll_pitch_rate_ef_yaw() with roll = -1000, pitch = -1500, yaw = 500 means
-    lean the vehicle left to 10degrees, pitch forward to 15degrees and rotate right
-    at 5deg/second. */
+    u_ctrl_roll = desval.x;
+    u_ctrl_pitch = desval.y;
 
     // IF pilot overrides by applying pitch/roll
    	float target_roll, target_pitch;

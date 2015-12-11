@@ -101,6 +101,18 @@ void AC_PrecLand::update(float alt_above_terrain_cm)
     }
 }
 
+// INITIALISE
+void AC_PrecLand::set_initial_vals()
+{
+	_prev_bf_roll_pos_offset = 0.0f;
+	_prev_bf_pitch_pos_offset = 0.0f;
+	_target_pos_offset.x = 0.0f;
+	_target_pos_offset.y = 0.0f;
+	_target_pos_offset.z = 0.0f;
+	_missed_target_frames = 0;
+	//_pi_precland_xy.set_integrator(Vector2f(des_vel.x/100.0f,des_vel.y/100.0f));
+}
+
 // get_target_shift - returns 3D vector of earth-frame position adjustments to target
 Vector3f AC_PrecLand::get_target_shift(const Vector3f &orig_target)
 {
@@ -161,10 +173,11 @@ void AC_PrecLand::calc_angles_and_pos(float alt_above_terrain_cm)
     // get current altitude (constrained to no lower than 50cm)
     float alt = MAX(alt_above_terrain_cm, 50.0f);
 
+    /// DON'T update these here
     // convert earth-frame angles to earth-frame position offset
-    _target_pos_offset.x = alt*tanf(_ef_angle_to_target.x);
-    _target_pos_offset.y = alt*tanf(_ef_angle_to_target.y);
-    _target_pos_offset.z = 0;  // not used
+    ///_target_pos_offset.x = alt*tanf(_ef_angle_to_target.x);
+    ///_target_pos_offset.y = alt*tanf(_ef_angle_to_target.y);
+    ///_target_pos_offset.z = 0;  // not used
 
     _have_estimate = true;
 }
@@ -174,22 +187,41 @@ void AC_PrecLand::calc_angles_and_pos(float alt_above_terrain_cm)
 //  raw sensor angles stored in _angle_to_target (might be in earth frame, or maybe body frame)
 //  earth-frame angles stored in _ef_angle_to_target
 //  position estimate is stored in _target_pos
-void AC_PrecLand::calc_angles_and_pos_out(float alt_above_terrain_cm, float &ef_target_pos_offset_x, float &ef_target_pos_offset_y)
+const Vector3f& AC_PrecLand::calc_angles_and_pos_out(float alt_above_terrain_cm)
 {
+    float d_gain = _pi_precland_xy.kI();
+
     // exit immediately if not enabled
     if (_backend == NULL) {
         _have_estimate = false;
-        return;
+        _target_pos_offset.x = 0.0f;
+        _target_pos_offset.y = 0.0f;
+        _target_pos_offset.z = 0.0f;
+        return _target_pos_offset;
     }
 
     // get angles to target from backend
     if (!_backend->get_angle_to_target(_angle_to_target.x, _angle_to_target.y)) {
         _have_estimate = false;
-        return;
+        _missed_target_frames++;
+        //_target_pos_offset.x = 0.0f;
+        //_target_pos_offset.y = 0.0f;
+        //_target_pos_offset.z = 0.0f;
+        return _target_pos_offset;
+    }
+
+    if (!_backend->get_angle_to_target(_angle_to_target.x, _angle_to_target.y) && _missed_target_frames > 50) {
+        _have_estimate = false;
+        _missed_target_frames = 0;
+        _target_pos_offset.x = 0.0f;
+        _target_pos_offset.y = 0.0f;
+        _target_pos_offset.z = 0.0f;
+        return _target_pos_offset;
     }
 
     float x_rad;
     float y_rad;
+    _missed_target_frames = 0;
 
     if(_backend->get_frame_of_reference() == MAV_FRAME_LOCAL_NED){
         //don't subtract vehicle lean angles
@@ -209,16 +241,30 @@ void AC_PrecLand::calc_angles_and_pos_out(float alt_above_terrain_cm, float &ef_
     // get current altitude (constrained to no lower than 50cm)
     float alt = MAX(alt_above_terrain_cm, 50.0f);
 
-
+    /// RE-PURPOSE this logged variable
     // convert earth-frame angles to earth-frame position offset
-    _target_pos_offset.x = alt*tanf(_ef_angle_to_target.x);
-    _target_pos_offset.y = alt*tanf(_ef_angle_to_target.y);
-    _target_pos_offset.z = 0;  // not used
+    ///_target_pos_offset.x = alt*tanf(_ef_angle_to_target.x);
+    ///_target_pos_offset.y = alt*tanf(_ef_angle_to_target.y);
+    ///_target_pos_offset.z = 0;  // not used
 
     // OUTPUT
-    ef_target_pos_offset_x = alt*tanf(x_rad);
-    ef_target_pos_offset_y = alt*tanf(y_rad);
+    float bf_roll_pos_offset = alt*tanf(x_rad);
+    float bf_pitch_pos_offset = alt*tanf(y_rad);
 
+    _target_pos_offset.x = _pi_precland_xy.kP()*bf_roll_pos_offset;
+    _target_pos_offset.y = -_pi_precland_xy.kP()*bf_pitch_pos_offset;
+    _target_pos_offset.z = 0.0f;
+
+    // ADD D-control
+    //_target_pos_offset.x = _pi_precland_xy.kP()*bf_roll_pos_offset + d_gain*(bf_roll_pos_offset-_prev_bf_roll_pos_offset);
+    //_target_pos_offset.y = -_pi_precland_xy.kP()*bf_pitch_pos_offset - d_gain*(bf_pitch_pos_offset-_prev_bf_pitch_pos_offset);
+    //_target_pos_offset.z = 0.0f;
+
+    // STORE previous value for D-control application
+    _prev_bf_roll_pos_offset = bf_roll_pos_offset;
+    _prev_bf_pitch_pos_offset = bf_pitch_pos_offset;
+
+    return _target_pos_offset;
 
     _have_estimate = true;
 }
