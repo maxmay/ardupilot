@@ -33,7 +33,7 @@ void Copter::althold_run()
     AltHoldModeState althold_state;
     float takeoff_climb_rate = 0.0f;
 
-    float limit_rollpitch = 1500; //centi-degrees
+    float limit_rollpitch = 1500; //centi-degrees limit for controlled value; should probably be reduced
 
     // initialize vertical speeds and acceleration
     pos_control.set_speed_z(-g.pilot_velocity_z_max, g.pilot_velocity_z_max);

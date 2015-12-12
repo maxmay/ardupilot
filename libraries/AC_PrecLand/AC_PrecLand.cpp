@@ -110,7 +110,8 @@ void AC_PrecLand::set_initial_vals()
 	_target_pos_offset.y = 0.0f;
 	_target_pos_offset.z = 0.0f;
 	_missed_target_frames = 0;
-	//_pi_precland_xy.set_integrator(Vector2f(des_vel.x/100.0f,des_vel.y/100.0f));
+	_integrator_roll_offset = 0.0f;
+	_integrator_pitch_offset = 0.0f;
 }
 
 // get_target_shift - returns 3D vector of earth-frame position adjustments to target
@@ -189,8 +190,10 @@ void AC_PrecLand::calc_angles_and_pos(float alt_above_terrain_cm)
 //  position estimate is stored in _target_pos
 const Vector3f& AC_PrecLand::calc_angles_and_pos_out(float alt_above_terrain_cm)
 {
-    //float d_gain = _pi_precland_xy.kI(); // default is 1
-	float d_gain = 25.0f;
+	float i_max = _pi_precland_xy.imax(); //
+	float i_gain = _pi_precland_xy.kI(); // set to 0; default is 1
+	float d_gain = _pi_precland_xy.filt_hz(); // set to 100; previously 25
+	float ctrl_max = _pi_precland_xy.imax(); // set to 2 (degrees)
 
     // exit immediately if not enabled
     if (_backend == NULL) {
@@ -217,6 +220,8 @@ const Vector3f& AC_PrecLand::calc_angles_and_pos_out(float alt_above_terrain_cm)
         _target_pos_offset.x = 0.0f;
         _target_pos_offset.y = 0.0f;
         _target_pos_offset.z = 0.0f;
+        _integrator_roll_offset = 0.0f;
+        _integrator_pitch_offset = 0.0f;
         return _target_pos_offset;
     }
 
@@ -260,6 +265,44 @@ const Vector3f& AC_PrecLand::calc_angles_and_pos_out(float alt_above_terrain_cm)
     _target_pos_offset.x = _pi_precland_xy.kP()*bf_roll_pos_offset + d_gain*(bf_roll_pos_offset-_prev_bf_roll_pos_offset);
     _target_pos_offset.y = -_pi_precland_xy.kP()*bf_pitch_pos_offset - d_gain*(bf_pitch_pos_offset-_prev_bf_pitch_pos_offset);
     _target_pos_offset.z = 0.0f;
+
+    // PID, ADD I-control
+    _integrator_roll_offset += bf_roll_pos_offset*i_gain;
+    _integrator_pitch_offset += bf_pitch_pos_offset*i_gain;
+
+    if (_integrator_roll_offset > i_max) {
+    	_integrator_roll_offset = i_max;
+    }
+    if (_integrator_pitch_offset > i_max) {
+    	_integrator_pitch_offset = i_max;
+    }
+    if (_integrator_roll_offset < -i_max) {
+    	_integrator_roll_offset = -i_max;
+    }
+    if (_integrator_pitch_offset < -i_max) {
+    	_integrator_pitch_offset = -i_max;
+    }
+
+    // PID, ADD I-control
+    _target_pos_offset.x = _pi_precland_xy.kP()*bf_roll_pos_offset +
+    		d_gain*(bf_roll_pos_offset-_prev_bf_roll_pos_offset) + _integrator_roll_offset;
+    _target_pos_offset.y = -_pi_precland_xy.kP()*bf_pitch_pos_offset -
+    		d_gain*(bf_pitch_pos_offset-_prev_bf_pitch_pos_offset) - _integrator_pitch_offset;
+    _target_pos_offset.z = 0.0f;
+
+    // CTRL Max
+    if (_target_pos_offset.x > ctrl_max) {
+    	_target_pos_offset.x = ctrl_max;
+        }
+    if (_integrator_pitch_offset > ctrl_max) {
+      	_integrator_pitch_offset = ctrl_max;
+    }
+    if (_target_pos_offset.x < -ctrl_max) {
+    	_target_pos_offset.x = -ctrl_max;
+        }
+    if (_integrator_pitch_offset < -ctrl_max) {
+      	_integrator_pitch_offset = -ctrl_max;
+    }
 
     // STORE previous value for D-control application
     _prev_bf_roll_pos_offset = bf_roll_pos_offset;

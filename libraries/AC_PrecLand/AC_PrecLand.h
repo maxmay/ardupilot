@@ -108,6 +108,8 @@ private:
     float                    _prev_bf_roll_pos_offset;
     float                    _prev_bf_pitch_pos_offset;
     uint32_t                 _missed_target_frames;
+    float                     _integrator_roll_offset;
+    float                     _integrator_pitch_offset;
 
     // output from controller
     Vector3f                    _desired_vel;       // desired velocity towards target in earth-frame
