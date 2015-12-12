@@ -189,7 +189,8 @@ void AC_PrecLand::calc_angles_and_pos(float alt_above_terrain_cm)
 //  position estimate is stored in _target_pos
 const Vector3f& AC_PrecLand::calc_angles_and_pos_out(float alt_above_terrain_cm)
 {
-    float d_gain = _pi_precland_xy.kI();
+    //float d_gain = _pi_precland_xy.kI(); // default is 1
+	float d_gain = 25.0f;
 
     // exit immediately if not enabled
     if (_backend == NULL) {
@@ -256,9 +257,9 @@ const Vector3f& AC_PrecLand::calc_angles_and_pos_out(float alt_above_terrain_cm)
     _target_pos_offset.z = 0.0f;
 
     // ADD D-control
-    //_target_pos_offset.x = _pi_precland_xy.kP()*bf_roll_pos_offset + d_gain*(bf_roll_pos_offset-_prev_bf_roll_pos_offset);
-    //_target_pos_offset.y = -_pi_precland_xy.kP()*bf_pitch_pos_offset - d_gain*(bf_pitch_pos_offset-_prev_bf_pitch_pos_offset);
-    //_target_pos_offset.z = 0.0f;
+    _target_pos_offset.x = _pi_precland_xy.kP()*bf_roll_pos_offset + d_gain*(bf_roll_pos_offset-_prev_bf_roll_pos_offset);
+    _target_pos_offset.y = -_pi_precland_xy.kP()*bf_pitch_pos_offset - d_gain*(bf_pitch_pos_offset-_prev_bf_pitch_pos_offset);
+    _target_pos_offset.z = 0.0f;
 
     // STORE previous value for D-control application
     _prev_bf_roll_pos_offset = bf_roll_pos_offset;
