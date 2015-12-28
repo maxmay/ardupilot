@@ -204,16 +204,6 @@ const Vector3f& AC_PrecLand::calc_angles_and_pos_out(float alt_above_terrain_cm)
         return _target_pos_offset;
     }
 
-    // get angles to target from backend
-    if (!_backend->get_angle_to_target(_angle_to_target.x, _angle_to_target.y)) {
-        _have_estimate = false;
-        _missed_target_frames++;
-        //_target_pos_offset.x = 0.0f;
-        //_target_pos_offset.y = 0.0f;
-        //_target_pos_offset.z = 0.0f;
-        return _target_pos_offset;
-    }
-
     if (!_backend->get_angle_to_target(_angle_to_target.x, _angle_to_target.y) && _missed_target_frames > 50) {
         _have_estimate = false;
         _missed_target_frames = 0;
@@ -222,6 +212,16 @@ const Vector3f& AC_PrecLand::calc_angles_and_pos_out(float alt_above_terrain_cm)
         _target_pos_offset.z = 0.0f;
         _integrator_roll_offset = 0.0f;
         _integrator_pitch_offset = 0.0f;
+        return _target_pos_offset;
+    }
+
+    // get angles to target from backend
+    if (!_backend->get_angle_to_target(_angle_to_target.x, _angle_to_target.y)) {
+        _have_estimate = false;
+        _missed_target_frames++;
+        //_target_pos_offset.x = 0.0f;
+        //_target_pos_offset.y = 0.0f;
+        //_target_pos_offset.z = 0.0f;
         return _target_pos_offset;
     }
 
