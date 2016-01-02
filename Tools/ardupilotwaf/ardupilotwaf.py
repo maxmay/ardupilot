@@ -15,8 +15,8 @@ UTILITY_SOURCE_EXTS = [ 'utility/' + glob for glob in SOURCE_EXTS ]
 # TODO: Once HAL patches get in, need to filter out the HAL based
 # on the bld.env.BOARD.
 COMMON_VEHICLE_DEPENDENT_LIBRARIES = [
+    'AP_AccelCal',
     'AP_ADC',
-    'AP_ADC_AnalogSource',
     'AP_AHRS',
     'AP_Airspeed',
     'AP_Baro',
@@ -37,7 +37,6 @@ COMMON_VEHICLE_DEPENDENT_LIBRARIES = [
     'AP_Notify',
     'AP_OpticalFlow',
     'AP_Param',
-    'AP_Progmem',
     'AP_Rally',
     'AP_RangeFinder',
     'AP_Scheduler',
@@ -91,6 +90,7 @@ def program(bld, **kw):
     target = bld.bldnode.make_node(name + '.' + bld.env.BOARD)
     bld.program(
         target=target,
+        name=name,
         **kw
     )
 

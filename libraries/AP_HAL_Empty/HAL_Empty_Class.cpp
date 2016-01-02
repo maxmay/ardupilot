@@ -9,19 +9,20 @@
 
 using namespace Empty;
 
-static EmptyUARTDriver uartADriver;
-static EmptyUARTDriver uartBDriver;
-static EmptyUARTDriver uartCDriver;
-static EmptySemaphore  i2cSemaphore;
-static EmptyI2CDriver  i2cDriver(&i2cSemaphore);
-static EmptySPIDeviceManager spiDeviceManager;
-static EmptyAnalogIn analogIn;
-static EmptyStorage storageDriver;
-static EmptyGPIO gpioDriver;
-static EmptyRCInput rcinDriver;
-static EmptyRCOutput rcoutDriver;
-static EmptyScheduler schedulerInstance;
-static EmptyUtil utilInstance;
+static UARTDriver uartADriver;
+static UARTDriver uartBDriver;
+static UARTDriver uartCDriver;
+static Semaphore  i2cSemaphore;
+static I2CDriver  i2cDriver(&i2cSemaphore);
+static SPIDeviceManager spiDeviceManager;
+static AnalogIn analogIn;
+static Storage storageDriver;
+static GPIO gpioDriver;
+static RCInput rcinDriver;
+static RCOutput rcoutDriver;
+static Scheduler schedulerInstance;
+static Util utilInstance;
+static OpticalFlow opticalFlowDriver;
 
 HAL_Empty::HAL_Empty() :
     AP_HAL::HAL(
@@ -41,7 +42,8 @@ HAL_Empty::HAL_Empty() :
         &rcinDriver,
         &rcoutDriver,
         &schedulerInstance,
-        &utilInstance),
+        &utilInstance,
+        &opticalFlowDriver),
     _member(new EmptyPrivateMember(123))
 {}
 

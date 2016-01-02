@@ -19,17 +19,25 @@
 ///				libraries.
 ///
 
-#ifndef __AP_COMMON_H__
-#define __AP_COMMON_H__
+#pragma once
 
+#include <AP_HAL/AP_HAL_Boards.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdbool.h>
 
+#if CONFIG_HAL_BOARD != HAL_BOARD_QURT
 #pragma GCC diagnostic warning "-Wall"
 #pragma GCC diagnostic warning "-Wextra"
 #pragma GCC diagnostic warning "-Wlogical-op"
 #pragma GCC diagnostic ignored "-Wredundant-decls"
+#else
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+#pragma GCC diagnostic ignored "-Wgnu-variable-sized-type-not-at-end"
+#pragma GCC diagnostic ignored "-Wgnu-designator"
+#pragma GCC diagnostic ignored "-Wabsolute-value"
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+#endif
 
 // used to pack structures
 #define PACKED __attribute__((__packed__))
@@ -45,22 +53,6 @@
 
 #define FMT_PRINTF(a,b) __attribute__((format(printf, a, b)))
 #define FMT_SCANF(a,b) __attribute__((format(scanf, a, b)))
-
-// Make some dire warnings into errors
-//
-// Some warnings indicate questionable code; rather than let
-// these slide, we force them to become errors so that the
-// developer has to find a safer alternative.
-//
-//#pragma GCC diagnostic error "-Wfloat-equal"
-
-// The following is strictly for type-checking arguments to printf calls
-// in conjunction with a suitably modified Arduino IDE; never define for
-// production as it generates bad code.
-//
-#if defined(PRINTF_FORMAT_WARNING_DEBUG)
- # define float double                  // silence spurious format warnings for %f
-#endif
 
 #define ToRad(x) radians(x)	// *pi/180
 #define ToDeg(x) degrees(x)	// *180/pi
@@ -162,4 +154,7 @@ enum HomeState {
 */
 bool is_bounded_int32(int32_t value, int32_t lower_bound, int32_t upper_bound);
 
-#endif // _AP_COMMON_H
+#if CONFIG_HAL_BOARD == HAL_BOARD_QURT
+#include <AP_HAL_QURT/replace.h>
+#endif
+

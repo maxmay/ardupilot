@@ -20,9 +20,9 @@
 #include <fenv.h>
 #include <AP_Math/AP_Math.h>
 #include <AP_HAL/AP_HAL.h>
+#include <AP_AccelCal/AP_AccelCal.h>
 #include <AP_ADC/AP_ADC.h>
 #include <AP_Declination/AP_Declination.h>
-#include <AP_ADC_AnalogSource/AP_ADC_AnalogSource.h>
 #include <Filter/Filter.h>
 #include <AP_Buffer/AP_Buffer.h>
 #include <AP_Airspeed/AP_Airspeed.h>
@@ -516,12 +516,16 @@ bool Replay::find_log_info(struct log_information &info)
         }
 
         if (strlen(clock_source) == 0) {
-            // if you want to add a clock source, also add it to
-            // handle_msg and handle_log_format_msg, above
-            if (streq(type, "IMU")) {
-                memcpy(clock_source, "IMU", 3);
-            } else if (streq(type, "IMT")) {
+            // If you want to add a clock source, also add it to
+            // handle_msg and handle_log_format_msg, above.  Note that
+            // ordering is important here.  For example, when we log
+            // IMT we may reduce the logging speed of IMU, so then
+            // using IMU as your clock source will lead to incorrect
+            // behaviour.
+            if (streq(type, "IMT")) {
                 memcpy(clock_source, "IMT", 3);
+            } else if (streq(type, "IMU")) {
+                memcpy(clock_source, "IMU", 3);
             } else {
                 continue;
             }
@@ -630,23 +634,7 @@ void Replay::setup()
 }
 
 void Replay::set_ins_update_rate(uint16_t _update_rate) {
-    switch (_update_rate) {
-    case 50:
-        _vehicle.ins.init(AP_InertialSensor::RATE_50HZ);
-        break;
-    case 100:
-        _vehicle.ins.init(AP_InertialSensor::RATE_100HZ);
-        break;
-    case 200:
-        _vehicle.ins.init(AP_InertialSensor::RATE_200HZ);
-        break;
-    case 400:
-        _vehicle.ins.init(AP_InertialSensor::RATE_400HZ);
-        break;
-    default:
-        printf("Invalid update rate (%d); use 50, 100, 200 or 400\n", _update_rate);
-        exit(1);
-    }
+    _vehicle.ins.init(_update_rate);
 }
 
 void Replay::inhibit_gyro_cal() {
@@ -886,7 +874,7 @@ void Replay::loop()
             Vector2f offset;
             uint8_t faultStatus;
 
-            const Matrix3f &dcm_matrix = _vehicle.ahrs.AP_AHRS_DCM::get_dcm_matrix();
+            const Matrix3f &dcm_matrix = _vehicle.ahrs.AP_AHRS_DCM::get_rotation_body_to_ned();
             dcm_matrix.to_euler(&DCM_attitude.x, &DCM_attitude.y, &DCM_attitude.z);
             _vehicle.EKF.getEulerAngles(ekf_euler);
             _vehicle.EKF.getVelNED(velNED);

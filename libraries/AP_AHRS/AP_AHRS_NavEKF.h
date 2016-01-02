@@ -51,7 +51,7 @@ public:
 
     // return the smoothed gyro vector corrected for drift
     const Vector3f &get_gyro(void) const;
-    const Matrix3f &get_dcm_matrix(void) const;
+    const Matrix3f &get_rotation_body_to_ned(void) const;
 
     // return the current drift correction integrator value
     const Vector3f &get_gyro_drift(void) const;
@@ -196,6 +196,9 @@ public:
     // inconsistency that will be accpeted by the filter
     // boolean false is returned if variances are not available
     bool get_variances(float &velVar, float &posVar, float &hgtVar, Vector3f &magVar, float &tasVar, Vector2f &offset) const;
+
+    void setTakeoffExpected(bool val);
+    void setTouchdownExpected(bool val);
 
 private:
     enum EKF_TYPE {EKF_TYPE_NONE=0,

@@ -81,7 +81,7 @@ void Plane::init_ardupilot()
 
     cliSerial->printf("\n\nInit " FIRMWARE_STRING
                          "\n\nFree RAM: %u\n",
-                        hal.util->available_memory());
+                      (unsigned)hal.util->available_memory());
 
 
     //
@@ -168,7 +168,9 @@ void Plane::init_ardupilot()
     if (g.compass_enabled==true) {
         bool compass_ok = compass.init() && compass.read();
 #if HIL_SUPPORT
+    if (!is_zero(g.hil_mode)) {
         compass_ok = true;
+    }
 #endif
         if (!compass_ok) {
             cliSerial->println("Compass initialisation failed!");
@@ -340,6 +342,13 @@ void Plane::set_mode(enum FlightMode mode)
 
     // reset crash detection
     crash_state.is_crashed = false;
+
+    // always reset this because we don't know who called set_mode. In evasion
+    // behavior you should set this flag after set_mode so you know the evasion
+    // logic is controlling the mode. This allows manual override of the mode
+    // to exit evasion behavior automatically but if the mode is manually switched
+    // then we won't resume AUTO after an evasion
+    adsb_state.is_evading = false;
 
     // set mode
     previous_mode = control_mode;
@@ -567,7 +576,7 @@ void Plane::startup_INS_ground(void)
     ahrs.set_vehicle_class(AHRS_VEHICLE_FIXED_WING);
     ahrs.set_wind_estimation(true);
 
-    ins.init(ins_sample_rate);
+    ins.init(scheduler.get_loop_rate_hz());
     ahrs.reset();
 
     // read Baro pressure at ground

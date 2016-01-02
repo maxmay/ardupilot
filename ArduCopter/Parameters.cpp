@@ -842,28 +842,6 @@ const AP_Param::Info Copter::var_info[] = {
     // @User: Standard
     GGROUP(p_pos_xy,                "POS_XY_", AC_P),
 
-#if PRECISION_LANDING == ENABLED
-     // @Param: PRECLNDVEL_P
-     // @DisplayName: Precision landing velocity controller P gain
-     // @Description: Precision landing velocity controller P gain
-     // @Range: 0.100 5.000
-     // @User: Advanced
-
-     // @Param: PRECLNDVEL_I
-     // @DisplayName: Precision landing velocity controller I gain
-     // @Description: Precision landing velocity controller I gain
-     // @Range: 0.100 5.000
-     // @User: Advanced
-
-     // @Param: PRECLNDVEL_IMAX
-     // @DisplayName: Precision landing velocity controller I gain maximum
-     // @Description: Precision landing velocity controller I gain maximum
-     // @Range: 0 1000
-     // @Units: cm/s
-     // @User: Standard
-     GGROUP(pi_precland,            "PLAND_", AC_PI_2D),
-#endif
-
     // variables not in the g class which contain EEPROM saved variables
 
 #if CAMERA == ENABLED
@@ -951,6 +929,10 @@ const AP_Param::Info Copter::var_info[] = {
     // @Path: ../libraries/AP_Mount/AP_Mount.cpp
     GOBJECT(camera_mount,           "MNT",  AP_Mount),
 #endif
+
+    // @Group: LOG
+    // @Path: ../libraries/DataFlash/DataFlash.cpp
+    GOBJECT(DataFlash,           "LOG",  DataFlash_Class),
 
     // @Group: BATT
     // @Path: ../libraries/AP_BattMonitor/AP_BattMonitor.cpp
@@ -1080,7 +1062,7 @@ const AP_Param::Info Copter::var_info[] = {
 #if PRECISION_LANDING == ENABLED
     // @Group: PRECLAND_
     // @Path: ../libraries/AC_PrecLand/AC_PrecLand.cpp
-    GOBJECT(precland, "PLAND_", AC_PrecLand),
+    GOBJECT(precland, "PLND_", AC_PrecLand),
 #endif
 
     // @Group: RPM
@@ -1112,6 +1094,10 @@ const AP_Param::Info Copter::var_info[] = {
     // @Range: 0.001 0.006
     // @User: Standard
     GSCALAR(autotune_min_d, "AUTOTUNE_MIN_D", 0.001f),
+
+    // @Group: NTF_
+    // @Path: ../libraries/AP_Notify/AP_Notify.cpp
+    GOBJECT(notify, "NTF_",  AP_Notify),
 
     AP_VAREND
 };
@@ -1168,6 +1154,6 @@ void Copter::load_parameters(void)
         // Load all auto-loaded EEPROM variables
         AP_Param::load_all();
         AP_Param::convert_old_parameters(&conversion_table[0], ARRAY_SIZE(conversion_table));
-        cliSerial->printf("load_all took %uus\n", micros() - before);
+        cliSerial->printf("load_all took %uus\n", (unsigned)(micros() - before));
     }
 }

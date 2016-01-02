@@ -21,6 +21,7 @@
 #include <stdint.h>
 #include <AP_HAL/AP_HAL.h>
 #include <AP_Math/AP_Math.h>
+#include <AP_AccelCal/AP_AccelCal.h>
 #include "AP_InertialSensor_UserInteract.h"
 #include <Filter/LowPassFilter.h>
 #include <Filter/LowPassFilter2p.h>
@@ -41,21 +42,14 @@ class DataFlash_Class;
  * blog post describing the method: http://chionophilous.wordpress.com/2011/10/24/accelerometer-calibration-iv-1-implementing-gauss-newton-on-an-atmega/
  * original sketch available at http://rolfeschmidt.com/mathtools/skimetrics/adxl_gn_calibration.pde
  */
-class AP_InertialSensor
+class AP_InertialSensor : AP_AccelCal_Client
 {
     friend class AP_InertialSensor_Backend;
 
 public:
     AP_InertialSensor();
-    static AP_InertialSensor *get_instance();
 
-    // the rate that updates will be available to the application
-    enum Sample_rate {
-        RATE_50HZ  = 50,
-        RATE_100HZ = 100,
-        RATE_200HZ = 200,
-        RATE_400HZ = 400
-    };
+    static AP_InertialSensor *get_instance();
 
     enum Gyro_Calibration_Timing {
         GYRO_CAL_NEVER = 0,
@@ -70,18 +64,13 @@ public:
     ///
     /// @param style	The initialisation startup style.
     ///
-    void init(Sample_rate sample_rate);
+    void init(uint16_t sample_rate_hz);
 
     /// Register a new gyro/accel driver, allocating an instance
     /// number
     uint8_t register_gyro(uint16_t raw_sample_rate_hz);
     uint8_t register_accel(uint16_t raw_sample_rate_hz);
 
-    // perform accelerometer calibration including providing user instructions
-    // and feedback
-    bool calibrate_accel(AP_InertialSensor_UserInteract *interact,
-                         float& trim_roll,
-                         float& trim_pitch);
     bool calibrate_trim(float &trim_roll, float &trim_pitch);
 
     /// calibrating - returns true if the gyros or accels are currently being calibrated
@@ -179,8 +168,11 @@ public:
     }
 
     // return the selected sample rate
-    Sample_rate get_sample_rate(void) const { return _sample_rate; }
+    uint16_t get_sample_rate(void) const { return _sample_rate; }
 
+    // return the main loop delta_t in seconds
+    float get_loop_delta_t(void) const { return _loop_delta_t; }
+    
     uint16_t error_count(void) const { return 0; }
     bool healthy(void) const { return get_gyro_health() && get_accel_health(); }
 
@@ -231,6 +223,26 @@ public:
 
     void detect_backends(void);
 
+    //Returns accel calibrator interface object pointer
+    AP_AccelCal* get_acal() const { return _acal; }
+
+    // Returns body fixed accelerometer level data averaged during accel calibration's first step
+    bool get_fixed_mount_accel_cal_sample(uint8_t sample_num, Vector3f& ret) const;
+
+    // Returns primary accelerometer level data averaged during accel calibration's first step
+    bool get_primary_accel_cal_sample_avg(uint8_t sample_num, Vector3f& ret) const;
+
+    // Returns newly calculated trim values if calculated
+    bool get_new_trim(float& trim_roll, float &trim_pitch);
+
+    // initialise and register accel calibrator
+    // called during the startup of accel cal
+    void acal_init();
+
+    // update accel calibrator
+    void acal_update();
+
+    bool accel_cal_requires_reboot() const { return _accel_cal_requires_reboot; }
 private:
 
     // load backend drivers
@@ -245,17 +257,6 @@ private:
     // blog post describing the method: http://chionophilous.wordpress.com/2011/10/24/accelerometer-calibration-iv-1-implementing-gauss-newton-on-an-atmega/
     // original sketch available at http://rolfeschmidt.com/mathtools/skimetrics/adxl_gn_calibration.pde
 
-    // _calibrate_accel - perform low level accel calibration
-    bool _calibrate_accel(const Vector3f accel_sample[6],
-                          Vector3f& accel_offsets,
-                          Vector3f& accel_scale,
-                          float max_abs_offsets,
-                          enum Rotation rotation);
-    bool _check_sample_range(const Vector3f accel_sample[6], enum Rotation rotation, 
-                             AP_InertialSensor_UserInteract* interact);
-    void _calibrate_update_matrices(float dS[6], float JS[6][6], float beta[6], float data[3]);
-    void _calibrate_reset_matrices(float dS[6], float JS[6][6]);
-    void _calibrate_find_delta(float dS[6], float JS[6][6], float delta[6]);
     bool _calculate_trim(const Vector3f &accel_sample, float& trim_roll, float& trim_pitch);
 
     // save parameters to eeprom
@@ -272,7 +273,8 @@ private:
     uint8_t _backend_count;
 
     // the selected sample rate
-    Sample_rate _sample_rate;
+    uint16_t _sample_rate;
+    float _loop_delta_t;
     
     // Most recent accelerometer reading
     Vector3f _accel[INS_MAX_INSTANCES];
@@ -384,9 +386,29 @@ private:
         float delta_time;
     } _hil {};
 
+    // Trim options
+    AP_Int8 _acc_body_aligned;
+    AP_Int8 _trim_option;
+
     DataFlash_Class *_dataflash;
 
     static AP_InertialSensor *_s_instance;
+    AP_AccelCal* _acal;
+
+    AccelCalibrator *_accel_calibrator;
+
+    //save accelerometer bias and scale factors
+    void _acal_save_calibrations();
+    void _acal_event_failure();
+
+    // Returns AccelCalibrator objects pointer for specified acceleromter
+    AccelCalibrator* _acal_get_calibrator(uint8_t i) { return i<get_accel_count()?&(_accel_calibrator[i]):NULL; }
+
+    float _trim_pitch;
+    float _trim_roll;
+    bool _new_trim;
+
+    bool _accel_cal_requires_reboot;
 };
 
 #include "AP_InertialSensor_Backend.h"
@@ -399,6 +421,8 @@ private:
 #include "AP_InertialSensor_LSM9DS0.h"
 #include "AP_InertialSensor_HIL.h"
 #include "AP_InertialSensor_SITL.h"
+#include "AP_InertialSensor_qflight.h"
+#include "AP_InertialSensor_QURT.h"
 #include "AP_InertialSensor_UserInteract_Stream.h"
 #include "AP_InertialSensor_UserInteract_MAVLink.h"
 

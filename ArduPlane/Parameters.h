@@ -222,6 +222,7 @@ public:
         k_param_camera_mount,
         k_param_camera_mount2,      // unused
         k_param_adsb,
+        k_param_notify,
 
         //
         // Battery monitoring parameters
@@ -323,6 +324,8 @@ public:
         k_param_pidTeThrottle, // unused
         k_param_pidNavPitchAltitude, // unused
         k_param_pidWheelSteer, // unused
+
+        k_param_DataFlash = 253, // Logging Group
 
         // 254,255: reserved
     };

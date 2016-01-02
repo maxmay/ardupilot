@@ -215,7 +215,7 @@ int8_t Rover::test_wp(uint8_t argc, const Menu::arg *argv)
 	delay(1000);
 
 	cliSerial->printf("%u waypoints\n", (unsigned)mission.num_commands());
-	cliSerial->printf("Hit radius: %f\n", g.waypoint_radius.get());
+	cliSerial->printf("Hit radius: %f\n", (double)g.waypoint_radius.get());
 
 	for(uint8_t i = 0; i < mission.num_commands(); i++){
         AP_Mission::Mission_Command temp_cmd;
@@ -308,7 +308,8 @@ int8_t Rover::test_ins(uint8_t argc, const Menu::arg *argv)
 	//cliSerial->printf("Calibrating.");
 	ahrs.init();
     ahrs.set_fly_forward(true);
-	ins.init(ins_sample_rate);
+
+    ins.init(scheduler.get_loop_rate_hz());
     ahrs.reset();
 
 	print_hit_enter();
@@ -371,7 +372,7 @@ int8_t Rover::test_mag(uint8_t argc, const Menu::arg *argv)
     ahrs.set_compass(&compass);
 
     // we need the AHRS initialised for this test
-	ins.init(ins_sample_rate);
+    ins.init(scheduler.get_loop_rate_hz());
     ahrs.reset();
 
 	int counter = 0;
@@ -389,7 +390,7 @@ int8_t Rover::test_mag(uint8_t argc, const Menu::arg *argv)
         if(medium_loopCounter >= 5){
             if (compass.read()) {
                 // Calculate heading
-                Matrix3f m = ahrs.get_dcm_matrix();
+                Matrix3f m = ahrs.get_rotation_body_to_ned();
                 heading = compass.calculate_heading(m);
                 compass.learn_offsets();
             }

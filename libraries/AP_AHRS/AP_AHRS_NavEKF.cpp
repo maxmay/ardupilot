@@ -48,10 +48,10 @@ const Vector3f &AP_AHRS_NavEKF::get_gyro(void) const
     return _gyro_estimate;
 }
 
-const Matrix3f &AP_AHRS_NavEKF::get_dcm_matrix(void) const
+const Matrix3f &AP_AHRS_NavEKF::get_rotation_body_to_ned(void) const
 {
     if (!active_EKF_type()) {
-        return AP_AHRS_DCM::get_dcm_matrix();
+        return AP_AHRS_DCM::get_rotation_body_to_ned();
     }
     return _dcm_matrix;
 }
@@ -1094,6 +1094,38 @@ bool AP_AHRS_NavEKF::get_variances(float &velVar, float &posVar, float &hgtVar, 
         tasVar = 0;
         offset.zero();
         return true;
+#endif
+    }
+}
+
+void AP_AHRS_NavEKF::setTakeoffExpected(bool val)
+{
+    switch (ekf_type()) {
+        case EKF_TYPE1:
+            EKF1.setTakeoffExpected(val);
+            break;
+        case EKF_TYPE2:
+            EKF2.setTakeoffExpected(val);
+            break;
+#if CONFIG_HAL_BOARD == HAL_BOARD_SITL
+        case EKF_TYPE_SITL:
+            break;
+#endif
+    }
+}
+
+void AP_AHRS_NavEKF::setTouchdownExpected(bool val)
+{
+    switch (ekf_type()) {
+        case EKF_TYPE1:
+            EKF1.setTouchdownExpected(val);
+            break;
+        case EKF_TYPE2:
+            EKF2.setTouchdownExpected(val);
+            break;
+#if CONFIG_HAL_BOARD == HAL_BOARD_SITL
+        case EKF_TYPE_SITL:
+            break;
 #endif
     }
 }

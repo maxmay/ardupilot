@@ -18,21 +18,24 @@
 /// @file	AP_Param.h
 /// @brief	A system for managing and storing variables that are of
 ///			general interest to the system.
+#pragma once
 
-#ifndef AP_PARAM_H
-#define AP_PARAM_H
-#include <AP_HAL/AP_HAL.h>
 #include <stddef.h>
 #include <string.h>
 #include <stdint.h>
 #include <math.h>
-#include "float.h"
 
-#include <AP_Progmem/AP_Progmem.h>
+#include <AP_HAL/AP_HAL.h>
 #include <StorageManager/StorageManager.h>
 
+#include "float.h"
+
 #define AP_MAX_NAME_SIZE 16
-#define AP_NESTED_GROUPS_ENABLED
+
+/*
+  flags for variables in var_info and group tables
+ */
+#define AP_PARAM_FLAG_NESTED_OFFSET 1
 
 // a variant of offsetof() to work around C++ restrictions.
 // this can only be used when the offset of a variable in a object
@@ -46,9 +49,11 @@
 #define AP_GROUPINFO(name, idx, class, element, def) { AP_CLASSTYPE(class, element), idx, name, AP_VAROFFSET(class, element), {def_value : def} }
 
 // declare a nested group entry in a group var_info
-#ifdef AP_NESTED_GROUPS_ENABLED
- #define AP_NESTEDGROUPINFO(class, idx) { AP_PARAM_GROUP, idx, "", 0, { group_info : class::var_info } }
-#endif
+#define AP_NESTEDGROUPINFO(class, idx) { AP_PARAM_GROUP, idx, "", 0, { group_info : class::var_info }, 0 }
+
+// declare a subgroup entry in a group var_info. This is for having another arbitrary object as a member of the parameter list of
+// an object
+#define AP_SUBGROUPINFO(element, name, idx, thisclass, elclass) { AP_PARAM_GROUP, idx, name, AP_VAROFFSET(thisclass, element), { group_info : elclass::var_info }, AP_PARAM_FLAG_NESTED_OFFSET }
 
 #define AP_GROUPEND     { AP_PARAM_NONE, 0xFF, "", 0, { group_info : NULL } }
 #define AP_VAREND       { AP_PARAM_NONE, "", 0, NULL, { group_info : NULL } }
@@ -64,6 +69,7 @@ enum ap_var_type {
     AP_PARAM_MATRIX3F,
     AP_PARAM_GROUP
 };
+
 
 /// Base class for variables.
 ///
@@ -84,6 +90,7 @@ public:
             const struct GroupInfo *group_info;
             const float def_value;
         };
+        uint8_t flags;
     };
     struct Info {
         uint8_t type; // AP_PARAM_*
@@ -112,7 +119,7 @@ public:
     {
         _var_info = info;
         uint16_t i;
-        for (i=0; pgm_read_byte(&info[i].type) != AP_PARAM_NONE; i++) ;
+        for (i=0; info[i].type != AP_PARAM_NONE; i++) ;
         _num_vars = i;
     }
 
@@ -141,7 +148,11 @@ public:
     /// @param	buffer			The destination buffer
     /// @param	bufferSize		Total size of the destination buffer.
     ///
-    void copy_name_info(const struct AP_Param::Info *info, const struct GroupInfo *ginfo, uint8_t idx, char *buffer, size_t bufferSize, bool force_scalar=false) const;
+    void copy_name_info(const struct AP_Param::Info *info,
+                        const struct GroupInfo *ginfo,
+                        const struct GroupInfo *ginfo0,
+                        uint8_t idx, char *buffer, size_t bufferSize, bool force_scalar=false) const;
+    
     /// Copy the variable's name, prefixed by any containing group name, to a
     /// buffer.
     ///
@@ -325,23 +336,28 @@ private:
                                     uint8_t                     vindex,
                                     uint8_t                     group_base,
                                     uint8_t                     group_shift,
+                                    uint32_t                    group_offset,
                                     uint32_t *                  group_element,
-                                    const struct GroupInfo **   group_ret,
+                                    const struct GroupInfo *   &group_ret,
+                                    const struct GroupInfo *   &group_ret0,
                                     uint8_t *                   idx) const;
     const struct Info *         find_var_info(
                                     uint32_t *                group_element,
-                                    const struct GroupInfo ** group_ret,
+                                    const struct GroupInfo *  &group_ret,
+                                    const struct GroupInfo *  &group_ret0,
                                     uint8_t *                 idx) const;
     const struct Info *			find_var_info_token(const ParamToken &token,
                                                     uint32_t *                 group_element,
-                                                    const struct GroupInfo **  group_ret,
+                                                    const struct GroupInfo *  &group_ret,
+                                                    const struct GroupInfo *  &group_ret0,
                                                     uint8_t *                  idx) const;
     static const struct Info *  find_by_header_group(
                                     struct Param_header phdr, void **ptr,
                                     uint8_t vindex,
                                     const struct GroupInfo *group_info,
                                     uint8_t group_base,
-                                    uint8_t group_shift);
+                                    uint8_t group_shift,
+                                    uint32_t group_offset);
     static const struct Info *  find_by_header(
                                     struct Param_header phdr,
                                     void **ptr);
@@ -352,6 +368,7 @@ private:
     static AP_Param *           find_group(
                                     const char *name,
                                     uint8_t vindex,
+                                    uint32_t group_offset,
                                     const struct GroupInfo *group_info,
                                     enum ap_var_type *ptype);
     static void                 write_sentinal(uint16_t ofs);
@@ -369,6 +386,7 @@ private:
                                     bool *found_current,
                                     uint8_t group_base,
                                     uint8_t group_shift,
+                                    uint32_t group_offset,
                                     ParamToken *token,
                                     enum ap_var_type *ptype);
 
@@ -658,5 +676,3 @@ AP_PARAMDEFA(float, Vector6f, 6, AP_PARAM_VECTOR6F);
 // _suffix is the suffix on the AP_* type name
 // _pt is the enum ap_var_type type
 #define AP_PARAMDEFV(_t, _suffix, _pt)   typedef AP_ParamV<_t, _pt> AP_ ## _suffix;
-
-#endif // AP_PARAM_H

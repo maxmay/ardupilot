@@ -40,6 +40,18 @@ const AP_Param::GroupInfo AP_RPM::var_info[] = {
     // @Increment: 1
     AP_GROUPINFO("_MAX", 2, AP_RPM, _maximum[0], 0),
 
+    // @Param: _MIN
+    // @DisplayName: Minimum RPM
+    // @Description: Minimum RPM to report
+    // @Increment: 1
+    AP_GROUPINFO("_MIN", 3, AP_RPM, _minimum[0], 0),
+
+    // @Param: _MIN_QUAL
+    // @DisplayName: Minimum Quality
+    // @Description: Minimum data quality to be used
+    // @Increment: 0.1
+    AP_GROUPINFO("_MIN_QUAL", 4, AP_RPM, _quality_min[0], 0.5),
+
 #if RPM_MAX_INSTANCES > 1
     // @Param: 2_TYPE
     // @DisplayName: Second RPM type
@@ -123,8 +135,25 @@ bool AP_RPM::healthy(uint8_t instance) const
     if (instance >= num_instances) {
         return false;
     }
-    // assume we get readings at at least 1Hz
-    if (AP_HAL::millis() - state[instance].last_reading_ms > 1000) {
+
+    // check that data quality is above minimum required
+    if (state[instance].signal_quality < _quality_min[0]) {
+        return false;
+    }
+
+    return true;
+}
+
+/*
+  check if an instance is activated
+ */
+bool AP_RPM::enabled(uint8_t instance) const
+{
+    if (instance >= num_instances) {
+        return false;
+    }
+    // if no sensor type is selected, the sensor is not activated.
+    if (_type[instance] == RPM_TYPE_NONE) {
         return false;
     }
     return true;
