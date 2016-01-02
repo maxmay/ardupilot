@@ -242,7 +242,6 @@ private:
             enum HomeState home_state   : 2; // 18,19   // home status (unset, set, locked)
             uint8_t using_interlock     : 1; // 20      // aux switch motor interlock function is in use
             uint8_t motor_emergency_stop: 1; // 21      // motor estop switch, shuts off motors when enabled
-            uint8_t land_repo_active    : 1; // 22      // true if the pilot is overriding the landing position
         };
         uint32_t value;
     } ap;
@@ -264,6 +263,14 @@ private:
         float alt_delta;
         uint32_t start_ms;
     } takeoff_state;
+
+    struct {
+        bool use_gps        : 1;    // land mode uses GPS (as opposed to purely pilot controlled)
+        bool use_precision  : 1;    // land mode uses precision land (i.e. IRLock, companion computer) to hit target
+        bool pause          : 1;    // land mode pauses for a few seconds before beginning to descend
+        bool repo_active    : 1;    // pilot is providing horizontal position input
+        uint32_t start_ms;
+    } land_state = {false, false, false, false, 0};
 
     RCMapper rcmap;
 
@@ -329,10 +336,10 @@ private:
     int32_t home_distance;
     // distance between plane and next waypoint in cm.
     uint32_t wp_distance;
-    uint8_t land_state;              // records state of land (flying to location, descending)
 
     // Auto
     AutoMode auto_mode;   // controls which auto controller is run
+    AutoLandState auto_land_state;
 
     // Guided
     GuidedMode guided_mode;  // controls which controller is run (pos or vel)
@@ -773,8 +780,12 @@ private:
     bool guided_limit_check();
     bool land_init(bool ignore_checks);
     void land_run();
+    bool land_gps_init();
     void land_gps_run();
+    void land_nogps_init();
     void land_nogps_run();
+    bool land_precision_init();
+    void land_precision_run();
     float get_land_descent_speed();
     void land_do_not_use_GPS();
     void set_mode_land_with_pause();

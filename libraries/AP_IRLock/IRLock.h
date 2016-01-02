@@ -41,7 +41,7 @@ public:
     // true if irlock sensor is online and healthy
     bool healthy() const { return _flags.healthy; }
 
-    // timestamp of most recent data read from the sensor
+    // timestamp of most recent data read from the sensor (in milliseconds)
     uint32_t last_update() const { return _last_update; }
 
     // returns the number of blocks in the current frame
@@ -50,9 +50,9 @@ public:
     // retrieve latest sensor data - returns true if new data is available
     virtual bool update() = 0;
 
-    // get_angle_to_target - retrieve body frame x and y angles (in radians) to target
+    // get_angle_to_target - retrieve body frame x and y angles and size (in radians) to target
     //  returns true if angles are available, false if not (i.e. no target)
-    bool get_angle_to_target(float &x_angle_rad, float &y_angle_rad) const;
+    bool get_angle_to_target(float &x_angle_rad, float &y_angle_rad, float &size_rad) const;
 
 protected:
     struct AP_IRLock_Flags {

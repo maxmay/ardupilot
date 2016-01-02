@@ -22,9 +22,9 @@ void Copter::update_precland()
         final_alt = sonar_alt;
     }
 
-    copter.precland.update(final_alt);
-
-    // log output
-    Log_Write_Precland();
+    if (copter.precland.update(final_alt)) {
+        // log output on each new sensor input
+        Log_Write_Precland();
+    }
 }
 #endif

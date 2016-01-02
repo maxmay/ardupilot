@@ -38,12 +38,16 @@ MAV_FRAME AC_PrecLand_Companion::get_frame_of_reference()
 // get_angle_to_target - returns angles (in radians) to target
 //  returns true if angles are available, false if not (i.e. no target)
 //  x_angle_rad : roll direction, positive = target is to right (looking down)
-//  y_angle_rad : pitch direction, postiive = target is forward (looking down)
-bool AC_PrecLand_Companion::get_angle_to_target(float &x_angle_rad, float &y_angle_rad)
+//  y_angle_rad : pitch direction, positive = target is forward (looking down)
+//  size_rad : target's size in radians
+//  capture_time_ms : system time in milliseconds that angles were captured
+bool AC_PrecLand_Companion::get_angle_to_target(float &x_angle_rad, float &y_angle_rad, float &size_rad, uint32_t &capture_time_ms)
 {
     if (_new_estimate){
         x_angle_rad = _angle_to_target.x;
         y_angle_rad = _angle_to_target.y;
+        size_rad = _size_rad;
+        capture_time_ms = _capture_time_ms;
 
         // reset and wait for new data
         _new_estimate = false;
@@ -63,7 +67,9 @@ void AC_PrecLand_Companion::handle_msg(mavlink_message_t* msg)
     _frame = (MAV_FRAME) packet.frame;
     _angle_to_target.x = packet.angle_x;
     _angle_to_target.y = packet.angle_y;
+    _size_rad = pythagorous2(packet.size_x, packet.size_y);
     _distance_to_target = packet.distance;
+    _capture_time_ms = hal.scheduler->millis();
     _state.healthy = true;
     _new_estimate = true;
 }

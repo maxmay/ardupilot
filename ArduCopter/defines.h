@@ -224,9 +224,11 @@ enum FlipState {
     Flip_Abandon
 };
 
-// LAND state
-#define LAND_STATE_FLY_TO_LOCATION  0
-#define LAND_STATE_DESCENDING       1
+// Auto mission Land states
+enum AutoLandState {
+    AutoLandState_FlyToLocation = 0,
+    AutoLandState_Descending
+};
 
 //  Logging parameters
 #define TYPE_AIRSTART_MSG               0x00

@@ -38,7 +38,7 @@ public:
     Vector2f    get_i_shrink();   // get_i but do not allow integrator to grow (it may shrink)
 
     // reset_I - reset the integrator
-    void        reset_I();
+    void        reset_I() { _flags._reset_filter = true; }
 
     // reset_filter - input filter will be reset to the next value provided to set_input()
     void        reset_filter();
@@ -66,8 +66,8 @@ public:
     void        filt_hz(const float v);
 
     Vector2f    get_integrator() const { return _integrator; }
-    void        set_integrator(const Vector2f &i) { _integrator = i; }
-    void        set_integrator(const Vector3f &i) { _integrator.x = i.x; _integrator.y = i.y; }
+    void        set_integrator(const Vector2f &i);
+    void        set_integrator(const Vector3f &i) { set_integrator(Vector2f(i.x,i.y)); }
 
     // parameter var table
     static const struct AP_Param::GroupInfo        var_info[];

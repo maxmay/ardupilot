@@ -80,8 +80,13 @@ Copter::Copter(void) :
     condition_start(0),
     G_Dt(0.0025f),
     inertial_nav(ahrs),
+#if FRAME_CONFIG == HELI_FRAME
     attitude_control(ahrs, aparm, motors, g.p_stabilize_roll, g.p_stabilize_pitch, g.p_stabilize_yaw,
                      g.pid_rate_roll, g.pid_rate_pitch, g.pid_rate_yaw),
+#else
+    attitude_control(ahrs, aparm, motors, g.p_stabilize_roll, g.p_stabilize_pitch, g.p_stabilize_yaw,
+                     g.pid_rate_roll, g.pid_rate_pitch, g.pid_rate_yaw),
+#endif
     pos_control(ahrs, inertial_nav, motors, attitude_control,
                 g.p_alt_hold, g.p_vel_z, g.pid_accel_z,
                 g.p_pos_xy, g.pi_vel_xy),
@@ -115,7 +120,7 @@ Copter::Copter(void) :
     terrain(ahrs, mission, rally),
 #endif
 #if PRECISION_LANDING == ENABLED
-    precland(ahrs, inertial_nav, MAIN_LOOP_SECONDS),
+    precland(ahrs, inertial_nav, g.pi_precland),
 #endif
 #if FRAME_CONFIG == HELI_FRAME
     // ToDo: Input Manager is only used by Heli for 3.3, but will be used by all frames for 3.4
