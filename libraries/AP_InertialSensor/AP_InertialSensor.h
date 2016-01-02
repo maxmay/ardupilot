@@ -9,6 +9,7 @@
 #define AP_INERTIAL_SENSOR_ACCEL_CLIP_THRESH_MSS        (15.5f*GRAVITY_MSS) // accelerometer values over 15.5G are recorded as a clipping error
 #define AP_INERTIAL_SENSOR_ACCEL_VIBE_FLOOR_FILT_HZ     5.0f    // accel vibration floor filter hz
 #define AP_INERTIAL_SENSOR_ACCEL_VIBE_FILT_HZ           2.0f    // accel vibration filter hz
+#define AP_INERTIAL_SENSOR_ACCEL_PEAK_DETECT_TIMEOUT_MS 500     // peak-hold detector timeout
 
 /**
    maximum number of INS instances available on this platform. If more
@@ -223,6 +224,10 @@ public:
 
     void detect_backends(void);
 
+    // accel peak hold detector
+    void set_accel_peak_hold(uint8_t instance, const Vector3f &accel);
+    float get_accel_peak_hold_neg_x() const { return _peak_hold_state.accel_peak_hold_neg_x; }
+
     //Returns accel calibrator interface object pointer
     AP_AccelCal* get_acal() const { return _acal; }
 
@@ -375,6 +380,12 @@ private:
     uint32_t _accel_clip_count[INS_MAX_INSTANCES];
     LowPassFilterVector3f _accel_vibe_floor_filter[INS_VIBRATION_CHECK_INSTANCES];
     LowPassFilterVector3f _accel_vibe_filter[INS_VIBRATION_CHECK_INSTANCES];
+
+    // peak hold detector state for primary accel
+    struct PeakHoldState {
+        float accel_peak_hold_neg_x;
+        uint32_t accel_peak_hold_neg_x_age;
+    } _peak_hold_state;
 
     // threshold for detecting stillness
     AP_Float _still_threshold;
