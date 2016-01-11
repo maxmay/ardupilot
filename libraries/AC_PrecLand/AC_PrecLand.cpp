@@ -188,12 +188,14 @@ void AC_PrecLand::calc_angles_and_pos(float alt_above_terrain_cm)
 //  raw sensor angles stored in _angle_to_target (might be in earth frame, or maybe body frame)
 //  earth-frame angles stored in _ef_angle_to_target
 //  position estimate is stored in _target_pos
-const Vector3f& AC_PrecLand::calc_angles_and_pos_out(float alt_above_terrain_cm)
+const Vector3f& AC_PrecLand::calc_angles_and_pos_out(float alt_above_terrain_cm, float p_gain, float d_gain_temp)
 {
 	float i_max = _pi_precland_xy.imax(); //
 	float i_gain = _pi_precland_xy.kI(); // set to 0; default is 1
-	float d_gain = _pi_precland_xy.filt_hz(); // set to 100; previously 25
+//	float d_gain = _pi_precland_xy.filt_hz(); // set to 100; previously 25
+	float d_gain = 50.0f*d_gain_temp;
 	float ctrl_max = _pi_precland_xy.imax(); // set to 2 (degrees)
+//	float p_gain = _pi_precland_xy.kP();
 
     // exit immediately if not enabled
     if (_backend == NULL) {
@@ -257,13 +259,13 @@ const Vector3f& AC_PrecLand::calc_angles_and_pos_out(float alt_above_terrain_cm)
     float bf_roll_pos_offset = alt*tanf(x_rad);
     float bf_pitch_pos_offset = alt*tanf(y_rad);
 
-    _target_pos_offset.x = _pi_precland_xy.kP()*bf_roll_pos_offset;
-    _target_pos_offset.y = -_pi_precland_xy.kP()*bf_pitch_pos_offset;
+    _target_pos_offset.x = p_gain*bf_roll_pos_offset;
+    _target_pos_offset.y = -p_gain*bf_pitch_pos_offset;
     _target_pos_offset.z = 0.0f;
 
     // ADD D-control
-    _target_pos_offset.x = _pi_precland_xy.kP()*bf_roll_pos_offset + d_gain*(bf_roll_pos_offset-_prev_bf_roll_pos_offset);
-    _target_pos_offset.y = -_pi_precland_xy.kP()*bf_pitch_pos_offset - d_gain*(bf_pitch_pos_offset-_prev_bf_pitch_pos_offset);
+    _target_pos_offset.x = p_gain*bf_roll_pos_offset + d_gain*(bf_roll_pos_offset-_prev_bf_roll_pos_offset);
+    _target_pos_offset.y = -p_gain*bf_pitch_pos_offset - d_gain*(bf_pitch_pos_offset-_prev_bf_pitch_pos_offset);
     _target_pos_offset.z = 0.0f;
 
     // PID, ADD I-control
@@ -284,9 +286,9 @@ const Vector3f& AC_PrecLand::calc_angles_and_pos_out(float alt_above_terrain_cm)
     }
 
     // PID, ADD I-control
-    _target_pos_offset.x = _pi_precland_xy.kP()*bf_roll_pos_offset +
+    _target_pos_offset.x = p_gain*bf_roll_pos_offset +
     		d_gain*(bf_roll_pos_offset-_prev_bf_roll_pos_offset) + _integrator_roll_offset;
-    _target_pos_offset.y = -_pi_precland_xy.kP()*bf_pitch_pos_offset -
+    _target_pos_offset.y = -p_gain*bf_pitch_pos_offset -
     		d_gain*(bf_pitch_pos_offset-_prev_bf_pitch_pos_offset) - _integrator_pitch_offset;
     _target_pos_offset.z = 0.0f;
 
