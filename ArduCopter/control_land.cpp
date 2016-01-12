@@ -113,6 +113,7 @@ void Copter::land_gps_run()
     if (!ap.land_repo_active) {
         wp_nav.shift_loiter_target(precland.get_target_shift(wp_nav.get_loiter_target()));
     }
+    ap.land_repo_active = false;
 #endif
 
     // run loiter controller
