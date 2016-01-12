@@ -56,8 +56,7 @@ void Copter::loiter_run()
 
         // record if pilot has overriden roll or pitch
         if (channel_roll->control_in != 0 || channel_pitch->control_in != 0) {
-            //ap.land_repo_active = true;
-        	ap.land_repo_active = false;
+            ap.land_repo_active = true;
         }
     } else {
         // clear out pilot desired acceleration in case radio failsafe event occurs and we do not switch to RTL for some reason
@@ -114,6 +113,7 @@ void Copter::loiter_run()
             if (!ap.land_repo_active) {
                     wp_nav.shift_loiter_target(precland.get_target_shift(wp_nav.get_loiter_target()));
                 }
+            ap.land_repo_active = false;
 		#endif
 
         // run loiter controller
@@ -149,6 +149,7 @@ void Copter::loiter_run()
         	if (!ap.land_repo_active) {
         		wp_nav.shift_loiter_target(precland.get_target_shift(wp_nav.get_loiter_target()));
         	}
+        	ap.land_repo_active = false;
         #endif
 
         // run loiter controller
