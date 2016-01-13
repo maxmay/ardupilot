@@ -296,14 +296,14 @@ const Vector3f& AC_PrecLand::calc_angles_and_pos_out(float alt_above_terrain_cm,
     if (_target_pos_offset.x > ctrl_max) {
     	_target_pos_offset.x = ctrl_max;
         }
-    if (_integrator_pitch_offset > ctrl_max) {
-      	_integrator_pitch_offset = ctrl_max;
+    if (_target_pos_offset.y > ctrl_max) {
+    	_target_pos_offset.y = ctrl_max;
     }
+    if (_target_pos_offset.y < -ctrl_max) {
+    	_target_pos_offset.y = -ctrl_max;
+        }
     if (_target_pos_offset.x < -ctrl_max) {
     	_target_pos_offset.x = -ctrl_max;
-        }
-    if (_integrator_pitch_offset < -ctrl_max) {
-      	_integrator_pitch_offset = -ctrl_max;
     }
 
     // STORE previous value for D-control application
