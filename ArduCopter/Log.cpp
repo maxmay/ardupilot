@@ -710,8 +710,8 @@ void Copter::Log_Write_Precland()
         healthy         : precland.healthy(),
         bf_angle_x      : degrees(bf_angle.x),
         bf_angle_y      : degrees(bf_angle.y),
-        ef_angle_x      : degrees(ef_angle.x),
-        ef_angle_y      : degrees(ef_angle.y),
+        ef_angle_x      : ef_angle.x,
+        ef_angle_y      : ef_angle.y,
         pos_x           : target_pos_ofs.x,
         pos_y           : target_pos_ofs.y
     };

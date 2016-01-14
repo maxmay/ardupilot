@@ -171,12 +171,16 @@ void AC_PrecLand::calc_angles_and_pos(float alt_above_terrain_cm)
         y_rad = -_angle_to_target.y + _ahrs.pitch;
     }
 
-    // rotate to earth-frame angles
-    _ef_angle_to_target.x = y_rad*_ahrs.cos_yaw() - x_rad*_ahrs.sin_yaw();
-    _ef_angle_to_target.y = y_rad*_ahrs.sin_yaw() + x_rad*_ahrs.cos_yaw();
+    // DON'T rotate to earth-frame angles
+    //_ef_angle_to_target.x = y_rad*_ahrs.cos_yaw() - x_rad*_ahrs.sin_yaw();
+    //_ef_angle_to_target.y = y_rad*_ahrs.sin_yaw() + x_rad*_ahrs.cos_yaw();
 
     // get current altitude (constrained to no lower than 50cm)
     float alt = MAX(alt_above_terrain_cm, 50.0f);
+
+    // RE-PURPOSE this logged variable: Target Offset in roll/pitch directions
+    _ef_angle_to_target.x = alt*tanf(x_rad);
+    _ef_angle_to_target.y = alt*tanf(y_rad);
 
     /// DON'T update these here
     // convert earth-frame angles to earth-frame position offset
@@ -197,7 +201,7 @@ const Vector3f& AC_PrecLand::calc_angles_and_pos_out(float alt_above_terrain_cm,
 	float i_max = _pi_precland_xy.imax(); //
 	float i_gain = _pi_precland_xy.kI(); // set to 0; default is 1
 //	float d_gain = _pi_precland_xy.filt_hz(); // set to 100; previously 25
-	float d_gain = 25.0f*d_gain_temp;
+	float d_gain = 100.0f*d_gain_temp;
 	float ctrl_max = _pi_precland_xy.imax(); // set to 2 (degrees)
 //	float p_gain = _pi_precland_xy.kP();
 
@@ -247,15 +251,18 @@ const Vector3f& AC_PrecLand::calc_angles_and_pos_out(float alt_above_terrain_cm,
         y_rad = -_angle_to_target.y + _ahrs.pitch;
     }
 
-    // rotate to earth-frame angles
-    _ef_angle_to_target.x = y_rad*_ahrs.cos_yaw() - x_rad*_ahrs.sin_yaw();
-    _ef_angle_to_target.y = y_rad*_ahrs.sin_yaw() + x_rad*_ahrs.cos_yaw();
-
+    // DON'T rotate to earth-frame angles
+    //_ef_angle_to_target.x = y_rad*_ahrs.cos_yaw() - x_rad*_ahrs.sin_yaw();
+    //_ef_angle_to_target.y = y_rad*_ahrs.sin_yaw() + x_rad*_ahrs.cos_yaw();
 
     // get current altitude (constrained to no lower than 50cm)
     float alt = MAX(alt_above_terrain_cm, 50.0f);
 
-    /// RE-PURPOSE this logged variable
+    // RE-PURPOSE this logged variable: Target Offset in roll/pitch directions
+    _ef_angle_to_target.x = alt*tanf(x_rad);
+    _ef_angle_to_target.y = alt*tanf(y_rad);
+
+    /// RE-PURPOSE this logged variable: Control in roll/pitch directions (centi-degrees)
     // convert earth-frame angles to earth-frame position offset
     ///_target_pos_offset.x = alt*tanf(_ef_angle_to_target.x);
     ///_target_pos_offset.y = alt*tanf(_ef_angle_to_target.y);
@@ -265,9 +272,9 @@ const Vector3f& AC_PrecLand::calc_angles_and_pos_out(float alt_above_terrain_cm,
     float bf_roll_pos_offset = alt*tanf(x_rad);
     float bf_pitch_pos_offset = alt*tanf(y_rad);
 
-    _target_pos_offset.x = p_gain*bf_roll_pos_offset;
-    _target_pos_offset.y = -p_gain*bf_pitch_pos_offset;
-    _target_pos_offset.z = 0.0f;
+    //_target_pos_offset.x = p_gain*bf_roll_pos_offset;
+    //_target_pos_offset.y = -p_gain*bf_pitch_pos_offset;
+    //_target_pos_offset.z = 0.0f;
 
     _d_term_x = d_gain*(bf_roll_pos_offset-_prev_bf_roll_pos_offset);
     _d_term_y = d_gain*(bf_pitch_pos_offset-_prev_bf_pitch_pos_offset);
