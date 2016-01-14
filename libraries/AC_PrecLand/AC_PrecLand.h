@@ -108,6 +108,10 @@ private:
     float                    _prev_bf_roll_pos_offset;
     float                    _prev_bf_pitch_pos_offset;
     uint32_t                 _missed_target_frames;
+    float					  _d_term_x;
+    float					  _d_term_y;
+    float					  _d_term_x_avg;
+    float					  _d_term_y_avg;
     float                     _integrator_roll_offset;
     float                     _integrator_pitch_offset;
 

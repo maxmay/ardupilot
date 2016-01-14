@@ -47,9 +47,9 @@ void Copter::althold_run()
     Vector3f desval;
     if (sonar_enabled && (sonar_alt_health >= SONAR_ALT_HEALTH_MAX)) {
         // if sonar is ok, use surface tracking
-    	desval = precland.calc_angles_and_pos_out(sonar_alt, g.acro_rp_p, g.acro_yaw_p);
+    	desval = precland.calc_angles_and_pos_out(sonar_alt, g.acro_rp_p, g.pi_vel_xy.kP());
     } else {
-    	desval = precland.calc_angles_and_pos_out(current_loc.alt, g.acro_rp_p, g.acro_yaw_p);
+    	desval = precland.calc_angles_and_pos_out(current_loc.alt, g.acro_rp_p, g.pi_vel_xy.kP());
     }
     u_ctrl_roll = desval.x;
     u_ctrl_pitch = desval.y;
