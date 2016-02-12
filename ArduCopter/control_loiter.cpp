@@ -2,6 +2,9 @@
 
 #include "Copter.h"
 
+static uint32_t count_shift_loiter;
+static uint32_t shift_period_loiter;
+
 /*
  * control_loiter.pde - init and run calls for loiter flight mode
  */
@@ -32,6 +35,12 @@ bool Copter::loiter_init(bool ignore_checks)
 
         // reset flag indicating if pilot has applied roll or pitch inputs during landing
         ap.land_repo_active = false;
+
+        // INITIALISE
+        precland.set_initial_vals();
+
+        count_shift_loiter = 0;
+        shift_period_loiter = 400;
 
         return true;
     }else{
@@ -140,11 +149,13 @@ void Copter::loiter_run()
         // get takeoff adjusted pilot and takeoff climb rates
         takeoff_get_climb_rates(target_climb_rate, takeoff_climb_rate);
 
-		#if PRECISION_LANDING == ENABLED
+        #if PRECISION_LANDING == ENABLED
             // run precision landing
-            if (!ap.land_repo_active) {
-                    wp_nav.shift_loiter_target(precland.get_target_shift(wp_nav.get_loiter_target()));
-                }
+        	count_shift_loiter++;
+            if (!ap.land_repo_active && count_shift_loiter==shift_period_loiter) {
+            	wp_nav.shift_loiter_target(precland.get_target_shift(wp_nav.get_loiter_target()));
+            	count_shift_loiter = 0;
+            }
 		#endif
 
         // run loiter controller
@@ -177,10 +188,12 @@ void Copter::loiter_run()
 
 		#if PRECISION_LANDING == ENABLED
         	// run precision landing
-        	if (!ap.land_repo_active) {
+        	count_shift_loiter++;
+        	if (!ap.land_repo_active && count_shift_loiter==shift_period_loiter) {
         		wp_nav.shift_loiter_target(precland.get_target_shift(wp_nav.get_loiter_target()));
+        		count_shift_loiter = 0;
         	}
-        #endif
+		#endif
 
         // run loiter controller
         wp_nav.update_loiter(ekfGndSpdLimit, ekfNavVelGainScaler);

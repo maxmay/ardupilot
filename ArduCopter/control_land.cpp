@@ -7,6 +7,9 @@ static bool land_with_gps;
 static uint32_t land_start_time;
 static bool land_pause;
 
+static uint32_t count_shift_land;
+static uint32_t shift_period_land;
+
 // land_init - initialise land controller
 bool Copter::land_init(bool ignore_checks)
 {
@@ -32,6 +35,12 @@ bool Copter::land_init(bool ignore_checks)
 
     // reset flag indicating if pilot has applied roll or pitch inputs during landing
     ap.land_repo_active = false;
+
+    // INITIALISE
+    precland.set_initial_vals();
+
+    count_shift_land = 0;
+    shift_period_land = 400;
 
     return true;
 }
@@ -110,8 +119,10 @@ void Copter::land_gps_run()
 
 #if PRECISION_LANDING == ENABLED
     // run precision landing
-    if (!ap.land_repo_active) {
+    count_shift_land++;
+    if (!ap.land_repo_active && count_shift_land==shift_period_land) {
         wp_nav.shift_loiter_target(precland.get_target_shift(wp_nav.get_loiter_target()));
+        count_shift_land = 0;
     }
 #endif
 

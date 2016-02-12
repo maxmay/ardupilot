@@ -49,6 +49,9 @@ public:
     // init - perform any required initialisation of landing controllers
     void init();
 
+    // INITIALIZE
+    void set_initial_vals();
+
     // healthy - returns true if precision landing is healthy
     bool healthy() { return _backend_state.healthy; }
 
@@ -98,6 +101,7 @@ private:
     // output from controller
     bool                        _have_estimate;     // true if we have a recent estimated position offset
     Vector3f                    _target_pos_offset; // estimate target position offset from vehicle in earth-frame
+    bool 						_flag_target_avg; //
 
     // backend state
     struct precland_state {

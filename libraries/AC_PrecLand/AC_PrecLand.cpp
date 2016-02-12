@@ -5,6 +5,8 @@
 #include <AC_PrecLand/AC_PrecLand_Companion.h>
 #include <AC_PrecLand/AC_PrecLand_IRLock.h>
 
+static Vector3f		_target_loc_avg; //
+
 extern const AP_HAL::HAL& hal;
 
 const AP_Param::GroupInfo AC_PrecLand::var_info[] PROGMEM = {
@@ -100,19 +102,43 @@ void AC_PrecLand::update(float alt_above_terrain_cm)
     }
 }
 
+// INITIALISE
+void AC_PrecLand::set_initial_vals()
+{
+	_target_loc_avg.x = 0.0f;
+	_target_loc_avg.y = 0.0f;
+	_target_loc_avg.z = 0.0f;
+    _flag_target_avg = false;
+}
+
 // get_target_shift - returns 3D vector of earth-frame position adjustments to target
 Vector3f AC_PrecLand::get_target_shift(const Vector3f &orig_target)
 {
     Vector3f shift; // default shift initialised to zero
+    Vector3f target_loc;
+    Vector3f curr_offset_from_target;
 
     // do not shift target if not enabled or no position estimate
     if (_backend == NULL || !_have_estimate) {
         return shift;
     }
 
+    if (_flag_target_avg==false){
+        // shift is target_offset - (original target - current position)
+        curr_offset_from_target = orig_target - _inav.get_position(); // a = b-c
+        target_loc = _target_pos_offset + _inav.get_position();                // d*= e+c
+        _target_loc_avg = target_loc;
+        _flag_target_avg = true;
+    }
+
     // shift is target_offset - (original target - current position)
-    Vector3f curr_offset_from_target = orig_target - _inav.get_position();
-    shift = _target_pos_offset - curr_offset_from_target;
+    curr_offset_from_target = orig_target - _inav.get_position(); // a = b-c
+    target_loc = _target_pos_offset + _inav.get_position();                // d*= e+c
+    _target_loc_avg.x = _target_loc_avg.x*0.95f + target_loc.x*0.05f;
+    _target_loc_avg.y = _target_loc_avg.y*0.95f + target_loc.y*0.05f;
+    //shift = _target_pos_offset - curr_offset_from_target;                  // f = e-a
+    shift = _target_loc_avg - _inav.get_position() - curr_offset_from_target; // f = d*-c-a
+    //shift = target_loc - _inav.get_position() - curr_offset_from_target; // f = d*-c-a
     shift.z = 0.0f;
 
     // record we have consumed this reading (perhaps there is a cleaner way to do this using timestamps)
