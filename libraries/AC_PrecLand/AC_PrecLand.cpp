@@ -158,3 +158,32 @@ void AC_PrecLand::calc_angles_and_pos(float alt_above_terrain_cm)
 
     _have_estimate = true;
 }
+
+// calc_angles_and_pos - converts sensor's body-frame angles to earth-frame angles and position estimate
+//  body-frame angles stored in _bf_angle_to_target
+//  earth-frame angles stored in _ef_angle_to_target
+//  position estimate is stored in _target_pos
+Vector3f AC_PrecLand::report_angles_and_pos(float alt_above_terrain_cm)
+{
+    Vector3f offset_report; // default initialised to zero
+
+	// exit immediately if not enabled
+    if (_backend == NULL) {
+        _have_estimate = false;
+        return offset_report;
+    }
+
+    // get body-frame angles to target from backend
+    if (!_backend->get_angle_to_target(_bf_angle_to_target.x, _bf_angle_to_target.y)) {
+        _have_estimate = false;
+        return offset_report;
+    }
+
+    offset_report.x = _target_pos_offset.x;
+    offset_report.y = _target_pos_offset.y;
+    offset_report.z = 0;  // not used
+
+    _have_estimate = true;
+
+    return offset_report;
+}

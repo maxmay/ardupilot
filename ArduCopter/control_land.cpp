@@ -7,6 +7,8 @@ static bool land_with_gps;
 static uint32_t land_start_time;
 static bool land_pause;
 
+static Vector3f offset_check;
+
 // land_init - initialise land controller
 bool Copter::land_init(bool ignore_checks)
 {
@@ -54,6 +56,16 @@ void Copter::land_gps_run()
 {
     int16_t roll_control = 0, pitch_control = 0;
     float target_yaw_rate = 0;
+
+    float thresh_offset = 10.0f; //alt sensor offset from ground
+    float thresh_alt_1 = 10.0f + thresh_offset;
+    float thresh_alt_2 = 25.0f + thresh_offset;
+    float thresh_alt_3 = 50.0f + thresh_offset;
+    float thresh_alt_4 = 75.0f + thresh_offset;
+    float thresh_pos_1 = 15.0f + thresh_offset; //TODO: REMOVE thresh_offset from last three
+    float thresh_pos_2 = 25.0f + thresh_offset;
+    float thresh_pos_3 = 50.0f + thresh_offset;
+    bool thresh_pos_flag = true; // are we in the pos range, when in the alt range for checking (set to false, if not)
 
     // if not auto armed or landed or motor interlock not enabled set throttle to zero and exit immediately
     if(!ap.auto_armed || ap.land_complete || !motors.get_interlock()) {
@@ -112,6 +124,24 @@ void Copter::land_gps_run()
     // run precision landing
     if (!ap.land_repo_active) {
         wp_nav.shift_loiter_target(precland.get_target_shift(wp_nav.get_loiter_target()));
+
+        offset_check = precland.report_angles_and_pos(sonar_alt);
+        float max_offset = max(offset_check.x,offset_check.y);
+        if (sonar_alt>thresh_alt_1 && sonar_alt<thresh_alt_2) {
+        	if (max_offset>thresh_pos_1) {
+        		thresh_pos_flag = false;
+        	}
+        }
+        if (sonar_alt>thresh_alt_2 && sonar_alt<thresh_alt_3) {
+           	if (max_offset>thresh_pos_2) {
+           		thresh_pos_flag = false;
+           	}
+        }
+        if (sonar_alt>thresh_alt_3 && sonar_alt<thresh_alt_4) {
+           	if (max_offset>thresh_pos_3) {
+           		thresh_pos_flag = false;
+          	}
+        }
     }
 #endif
 
@@ -134,7 +164,11 @@ void Copter::land_gps_run()
     desired_climb_rate = cmb_rate;
 
     // update altitude target and call position controller
+    if (thresh_pos_flag==true){
     pos_control.set_alt_target_from_climb_rate(cmb_rate, G_Dt, true);
+    } else {
+    pos_control.set_alt_target_from_climb_rate(-cmb_rate, G_Dt, true);
+    }
     pos_control.update_z_controller();
 }
 
