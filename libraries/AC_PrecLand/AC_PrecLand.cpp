@@ -167,6 +167,12 @@ Vector3f AC_PrecLand::report_angles_and_pos(float alt_above_terrain_cm)
 {
     Vector3f offset_report; // default initialised to zero
 
+    // do not shift target if not enabled or no position estimate
+    //if (_backend == NULL || !_have_estimate) {
+    //    return offset_report;
+    //}
+
+    /*
 	// exit immediately if not enabled
     if (_backend == NULL) {
         _have_estimate = false;
@@ -178,12 +184,13 @@ Vector3f AC_PrecLand::report_angles_and_pos(float alt_above_terrain_cm)
         _have_estimate = false;
         return offset_report;
     }
+    */
 
     offset_report.x = _target_pos_offset.x;
     offset_report.y = _target_pos_offset.y;
     offset_report.z = 0;  // not used
 
-    _have_estimate = true;
+    //_have_estimate = true;
 
     return offset_report;
 }

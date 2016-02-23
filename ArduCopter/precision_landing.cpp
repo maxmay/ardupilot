@@ -16,11 +16,11 @@ void Copter::init_precland()
 void Copter::update_precland()
 {
     float final_alt = current_loc.alt;
-    float offset_sensor_alt = 3.0f;
+    int16_t offset_sensor_alt = 3;
 
     // use range finder altitude if it is valid
     if (sonar_enabled && (sonar_alt_health >= SONAR_ALT_HEALTH_MAX)) {
-        final_alt = sonar_alt - offset_sensor_alt;
+        final_alt = float(sonar_alt - offset_sensor_alt);
     }
 
     copter.precland.update(final_alt);
