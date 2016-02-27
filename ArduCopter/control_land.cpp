@@ -59,10 +59,10 @@ void Copter::land_gps_run()
 
     int16_t thresh_offset = 10; //alt sensor offset from ground
     int16_t thresh_alt_1 = 1;
-    int16_t thresh_alt_2 = 50 + thresh_offset;
-    int16_t thresh_alt_3 = 75 + thresh_offset;
-    int16_t thresh_alt_4 = 100 + thresh_offset;
-    float thresh_pos_1 = 10.0f; //TODO: REMOVE thresh_offset from last three
+    int16_t thresh_alt_2 = 100 + thresh_offset;
+    int16_t thresh_alt_3 = 200 + thresh_offset;
+    int16_t thresh_alt_4 = 300 + thresh_offset;
+    float thresh_pos_1 = 10.0f;
     float thresh_pos_2 = 25.0f;
     float thresh_pos_3 = 35.0f;
     bool thresh_pos_flag = true; // are we in the pos range, when in the alt range for checking (set to false, if not)
@@ -126,7 +126,7 @@ void Copter::land_gps_run()
         wp_nav.shift_loiter_target(precland.get_target_shift(wp_nav.get_loiter_target()));
 
         offset_check = precland.report_angles_and_pos(sonar_alt);
-        float max_offset = max(offset_check.x,offset_check.y);
+        float max_offset = max(abs(offset_check.x),abs(offset_check.y));
         if (sonar_alt>thresh_alt_1 && sonar_alt<thresh_alt_2) {
         	if (max_offset>thresh_pos_1) {
         		thresh_pos_flag = false;
@@ -160,17 +160,17 @@ void Copter::land_gps_run()
         cmb_rate = get_land_descent_speed();
     }
 
-
-
     // update altitude target and call position controller
     if (thresh_pos_flag==true){
-    pos_control.set_alt_target_from_climb_rate(cmb_rate, G_Dt, true);
-    // record desired climb rate for logging
-    desired_climb_rate = cmb_rate;
+    	pos_control.set_alt_target_from_climb_rate(cmb_rate, G_Dt, true);
+    	// record desired climb rate for logging
+    	desired_climb_rate = cmb_rate;
     } else {
-    pos_control.set_alt_target_from_climb_rate(-cmb_rate, G_Dt, false);
-    // record desired climb rate for logging
-    desired_climb_rate = -cmb_rate;
+    	cmb_rate = 50.0f;
+    	pos_control.set_alt_target_from_climb_rate(cmb_rate, G_Dt, false);
+    	//pos_control.add_takeoff_climb_rate(takeoff_climb_rate, G_Dt);
+    	// record desired climb rate for logging
+    	desired_climb_rate = cmb_rate;
     }
     pos_control.update_z_controller();
 }
