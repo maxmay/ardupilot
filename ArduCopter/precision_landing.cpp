@@ -16,7 +16,7 @@ void Copter::init_precland()
 void Copter::update_precland()
 {
     float final_alt = current_loc.alt;
-    int16_t offset_sensor_alt = 3;
+    int16_t offset_sensor_alt = 3; //offset between alt sensor and irlock sensor in cm
 
     // use range finder altitude if it is valid
     if (sonar_enabled && (sonar_alt_health >= SONAR_ALT_HEALTH_MAX)) {

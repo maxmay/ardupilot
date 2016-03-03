@@ -57,12 +57,12 @@ void Copter::land_gps_run()
     int16_t roll_control = 0, pitch_control = 0;
     float target_yaw_rate = 0;
 
-    int16_t thresh_offset = 10; //alt sensor offset from ground
-    int16_t thresh_alt_1 = 1;
+    int16_t thresh_offset = 10; //alt sensor offset from ground in cm
+    int16_t thresh_alt_1 = 1; //alt thresholds in cm
     int16_t thresh_alt_2 = 100 + thresh_offset;
     int16_t thresh_alt_3 = 200 + thresh_offset;
     int16_t thresh_alt_4 = 300 + thresh_offset;
-    float thresh_pos_1 = 10.0f;
+    float thresh_pos_1 = 10.0f; //position offset bounds in cm
     float thresh_pos_2 = 25.0f;
     float thresh_pos_3 = 35.0f;
     bool thresh_pos_flag = true; // are we in the pos range, when in the alt range for checking (set to false, if not)
