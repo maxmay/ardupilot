@@ -121,7 +121,7 @@ float AP_L1_Control::crosstrack_error(void) const
  */
 void AP_L1_Control::_prevent_indecision(float &Nu)
 {
-    const float Nu_limit = 0.9f*M_PI_F;
+    const float Nu_limit = 0.9f*M_PI;
     if (fabsf(Nu) > Nu_limit &&
         fabsf(_last_Nu) > Nu_limit &&
         fabsf(wrap_180_cd(_target_bearing_cd - _ahrs.yaw_sensor)) > 12000 &&
@@ -142,7 +142,14 @@ void AP_L1_Control::update_waypoint(const struct Location &prev_WP, const struct
 	float Nu;
 	float xtrackVel;
 	float ltrackVel;
-	
+
+    uint32_t now = AP_HAL::micros();
+    float dt = (now - _last_update_waypoint_us) * 1.0e-6f;
+    if (dt > 0.1) {
+        dt = 0.1;
+    }
+    _last_update_waypoint_us = now;
+    
 	// Calculate L1 gain required for specified damping
 	float K_L1 = 4.0f * _L1_damping * _L1_damping;
 
@@ -220,8 +227,6 @@ void AP_L1_Control::update_waypoint(const struct Location &prev_WP, const struct
 		    _L1_xtrack_i = 0;
 		    _L1_xtrack_i_gain_prev = _L1_xtrack_i_gain;
 		} else if (fabsf(Nu1) < radians(5)) {
-
-            const float dt = 0.1f; // 10Hz
             _L1_xtrack_i += Nu1 * _L1_xtrack_i_gain * dt;
 
             // an AHRS_TRIM_X=0.1 will drift to about 0.08 so 0.1 is a good worst-case to clip at

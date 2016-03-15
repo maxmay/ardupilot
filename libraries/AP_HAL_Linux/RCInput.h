@@ -1,11 +1,8 @@
-
-#ifndef __AP_HAL_LINUX_RCINPUT_H__
-#define __AP_HAL_LINUX_RCINPUT_H__
+#pragma once
 
 #include "AP_HAL_Linux.h"
 
 #define LINUX_RC_INPUT_NUM_CHANNELS 16
-#define LINUX_RC_INPUT_CHANNEL_INVALID (999)
 
 class Linux::RCInput : public AP_HAL::RCInput {
 public:
@@ -18,8 +15,6 @@ public:
     virtual void init();
     bool new_input();
     uint8_t num_channels();
-    void set_num_channels(uint8_t num);
-
     uint16_t read(uint8_t ch);
     uint8_t read(uint16_t* periods, uint8_t len);
 
@@ -36,8 +31,7 @@ public:
     
     
  protected:
-    void _process_rc_pulse(uint16_t width_s0, uint16_t width_s1,
-                           uint16_t channel = LINUX_RC_INPUT_CHANNEL_INVALID);
+    void _process_rc_pulse(uint16_t width_s0, uint16_t width_s1);
     void _update_periods(uint16_t *periods, uint8_t len);
 
  private:
@@ -49,7 +43,6 @@ public:
     void _process_ppmsum_pulse(uint16_t width);
     void _process_sbus_pulse(uint16_t width_s0, uint16_t width_s1);
     void _process_dsm_pulse(uint16_t width_s0, uint16_t width_s1);
-    void _process_pwm_pulse(uint16_t channel, uint16_t width_s0, uint16_t width_s1);
 
     /* override state */
     uint16_t _override[LINUX_RC_INPUT_NUM_CHANNELS];
@@ -82,5 +75,3 @@ public:
 
 #include "RCInput_PRU.h"
 #include "RCInput_ZYNQ.h"
-
-#endif // __AP_HAL_LINUX_RCINPUT_H__

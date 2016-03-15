@@ -16,6 +16,21 @@
 
 #include "AP_Notify.h"
 
+#include "AP_BoardLED.h"
+#include "Buzzer.h"
+#include "Display_SSD1306_I2C.h"
+#include "ExternalLED.h"
+#include "NavioLED_I2C.h"
+#include "OreoLED_PX4.h"
+#include "RCOutputRGBLed.h"
+#include "ToneAlarm_Linux.h"
+#include "ToneAlarm_PX4.h"
+#include "ToshibaLED.h"
+#include "ToshibaLED_I2C.h"
+#include "ToshibaLED_PX4.h"
+#include "VRBoard_LED.h"
+#include "DiscreteRGBLed.h"
+
 // table of user settable parameters
 const AP_Param::GroupInfo AP_Notify::var_info[] = {
 
@@ -61,20 +76,24 @@ struct AP_Notify::notify_events_type AP_Notify::events;
     NotifyDevice *AP_Notify::_devices[] = {&boardled, &toshibaled, &externalled, &buzzer};
 #elif CONFIG_HAL_BOARD == HAL_BOARD_LINUX
     #if CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_NAVIO
-        AP_BoardLED boardled;
         NavioLED_I2C navioled;
         ToshibaLED_I2C toshibaled;
-        NotifyDevice *AP_Notify::_devices[] = {&boardled, &navioled, &toshibaled};
-    #elif CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_BBBMINI
+        NotifyDevice *AP_Notify::_devices[] = {&navioled, &toshibaled};
+    #elif CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_NAVIO2
+        DiscreteRGBLed navioled(4, 27, 6, false);
         ToshibaLED_I2C toshibaled;
-        NotifyDevice *AP_Notify::_devices[] = {&toshibaled};
+        NotifyDevice *AP_Notify::_devices[] = {&navioled, &toshibaled};
+    #elif CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_BBBMINI
+        Display_SSD1306_I2C display;
+        NotifyDevice *AP_Notify::_devices[] = {&display};
     #elif CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_RASPILOT
         ToshibaLED_I2C toshibaled;
         ToneAlarm_Linux tonealarm;
         NotifyDevice *AP_Notify::_devices[] = {&toshibaled, &tonealarm};
     #elif CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_MINLURE
         NotifyDevice *AP_Notify::_devices[0];
-    #elif CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_ERLEBRAIN2
+    #elif CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_ERLEBRAIN2 || \
+      CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_PXFMINI
         AP_BoardLED boardled;
         NotifyDevice *AP_Notify::_devices[] = {&boardled};
     #elif CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_BH

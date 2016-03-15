@@ -133,7 +133,9 @@ void Aircraft::update_position(void)
         time_now_us += frame_time_us;
     }
     last_time_us = time_now_us;
-    sync_frame_time();
+    if (use_time_sync) {
+        sync_frame_time();
+    }
 }
 
 /*
@@ -216,10 +218,10 @@ void Aircraft::add_noise(float throttle)
 {
     gyro += Vector3f(rand_normal(0, 1),
                      rand_normal(0, 1),
-                     rand_normal(0, 1)) * gyro_noise * throttle;
+                     rand_normal(0, 1)) * gyro_noise * fabsf(throttle);
     accel_body += Vector3f(rand_normal(0, 1),
                            rand_normal(0, 1),
-                           rand_normal(0, 1)) * accel_noise * throttle;
+                           rand_normal(0, 1)) * accel_noise * fabsf(throttle);
 }
 
 /*
@@ -359,8 +361,9 @@ void Aircraft::update_dynamics(const Vector3f &rot_accel)
 
     // constrain height to the ground
     if (on_ground(position)) {
-        if (!on_ground(old_position)) {
+        if (!on_ground(old_position) && AP_HAL::millis() - last_ground_contact_ms > 1000) {
             printf("Hit ground at %f m/s\n", velocity_ef.z);
+            last_ground_contact_ms = AP_HAL::millis();
         }
         position.z = -(ground_level + frame_height - home.alt*0.01f);
     }

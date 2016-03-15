@@ -88,6 +88,18 @@
 #include <AP_BattMonitor/AP_BattMonitor.h>     // Battery monitor library
 #include <AP_BoardConfig/AP_BoardConfig.h>     // board configuration library
 #include <AP_Frsky_Telem/AP_Frsky_Telem.h>
+#include <AP_LandingGear/AP_LandingGear.h>     // Landing Gear library
+#include <AP_Terrain/AP_Terrain.h>
+#include <AP_ADSB/AP_ADSB.h>
+#include <AP_RPM/AP_RPM.h>
+#include <AC_InputManager/AC_InputManager.h>        // Pilot input handling library
+#include <AC_InputManager/AC_InputManager_Heli.h>   // Heli specific pilot input handling library
+
+// Configuration
+#include "defines.h"
+#include "config.h"
+
+// libraries which are dependent on #defines in defines.h and/or config.h
 #if SPRAYER == ENABLED
 #include <AC_Sprayer/AC_Sprayer.h>         // crop sprayer library
 #endif
@@ -97,23 +109,10 @@
 #if PARACHUTE == ENABLED
 #include <AP_Parachute/AP_Parachute.h>       // Parachute release library
 #endif
-#include <AP_LandingGear/AP_LandingGear.h>     // Landing Gear library
-#include <AP_Terrain/AP_Terrain.h>
-#include <AP_ADSB/AP_ADSB.h>
-#include <AP_RPM/AP_RPM.h>
 #if PRECISION_LANDING == ENABLED
 #include <AC_PrecLand/AC_PrecLand.h>
 #include <AP_IRLock/AP_IRLock.h>
 #endif
-#include <AC_InputManager/AC_InputManager.h>        // Pilot input handling library
-#include <AC_InputManager/AC_InputManager_Heli.h>   // Heli specific pilot input handling library
-
-
-// AP_HAL to Arduino compatibility layer
-// Configuration
-#include "defines.h"
-#include "config.h"
-#include "config_channels.h"
 
 // Local modules
 #include "Parameters.h"
@@ -340,7 +339,15 @@ private:
     // RTL
     RTLState rtl_state;  // records state of rtl (initial climb, returning home, etc)
     bool rtl_state_complete; // set to true if the current state is completed
-    float rtl_alt;     // altitude the vehicle is returning at
+
+    struct {
+        // NEU w/ origin-relative altitude
+        Vector3f origin_point;
+        Vector3f climb_target;
+        Vector3f return_target;
+        Vector3f descent_target;
+        bool land;
+    } rtl_path;
 
     // Circle
     bool circle_pilot_yaw_override; // true if pilot is overriding yaw
@@ -368,6 +375,12 @@ private:
     // Flip
     Vector3f flip_orig_attitude;         // original copter attitude before flip
 
+    // Throw
+    bool throw_early_exit_interlock = true; // value of the throttle interlock that must be restored when exiting throw mode early
+    bool throw_flight_commenced = false;    // true when the throw has been detected and the motors and control loops are running
+    uint32_t throw_free_fall_start_ms = 0;  // system time free fall was detected
+    float throw_free_fall_start_velz = 0.0f;// vertical velocity when free fall was detected
+
     // Battery Sensors
     AP_BattMonitor battery;
 
@@ -386,6 +399,9 @@ private:
     int32_t baro_alt;            // barometer altitude in cm above home
     float baro_climbrate;        // barometer climbrate in cm/s
     LowPassFilterVector3f land_accel_ef_filter; // accelerations for land and crash detector tests
+
+    // filtered pilot's throttle input used to cancel landing if throttle held high
+    LowPassFilterFloat rc_throttle_control_in_filter;
 
     // 3D Location vectors
     // Current location of the copter (altitude is relative to home)
@@ -562,6 +578,7 @@ private:
     void rc_loop();
     void throttle_loop();
     void update_mount();
+    void update_trigger(void);
     void update_batt_compass(void);
     void ten_hz_logging_loop();
     void fifty_hz_logging_loop();
@@ -622,7 +639,6 @@ private:
     void send_rpm(mavlink_channel_t chan);
     void rpm_update();
     void send_pid_tuning(mavlink_channel_t chan);
-    void send_statustext(mavlink_channel_t chan);
     bool telemetry_delayed(mavlink_channel_t chan);
     void gcs_send_message(enum ap_message id);
     void gcs_send_mission_item_reached_message(uint16_t mission_index);
@@ -656,6 +672,7 @@ private:
     void Log_Write_Heli(void);
 #endif
     void Log_Write_Precland();
+    void Log_Write_GuidedTarget(uint8_t target_type, const Vector3f& pos_target, const Vector3f& vel_target);
     void Log_Write_Vehicle_Startup_Messages();
     void Log_Read(uint16_t log_num, uint16_t start_page, uint16_t end_page);
     void start_logging() ;
@@ -791,6 +808,14 @@ private:
     void poshold_roll_controller_to_pilot_override();
     void poshold_pitch_controller_to_pilot_override();
 
+    // Throw to launch functionality
+    bool throw_init(bool ignore_checks);
+    void throw_exit();
+    void throw_run();
+    bool throw_detected();
+    bool throw_attitude_good();
+    bool throw_height_good();
+
     bool rtl_init(bool ignore_checks);
     void rtl_run();
     void rtl_climb_start();
@@ -802,7 +827,8 @@ private:
     void rtl_descent_run();
     void rtl_land_start();
     void rtl_land_run();
-    float get_RTL_alt();
+    void rtl_build_path();
+    float rtl_compute_return_alt_above_origin(float rtl_return_dist);
     bool sport_init(bool ignore_checks);
     void sport_run();
     bool stabilize_init(bool ignore_checks);
@@ -818,6 +844,7 @@ private:
     void esc_calibration_startup_check();
     void esc_calibration_passthrough();
     void esc_calibration_auto();
+    bool should_disarm_on_failsafe();
     void failsafe_radio_on_event();
     void failsafe_radio_off_event();
     void failsafe_battery_event(void);

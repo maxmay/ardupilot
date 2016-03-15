@@ -180,6 +180,7 @@ public:
         k_param_motors = 90,
         k_param_disarm_delay,
         k_param_fs_crash_check,
+        k_param_throw_motor_start,
 
         // 97: RSSI
         k_param_rssi = 97,
@@ -217,7 +218,8 @@ public:
         // 135 : reserved for Solo until features merged with master
         //
         k_param_rtl_speed_cms = 135,
-        k_param_fs_batt_curr_rtl, // 136
+        k_param_fs_batt_curr_rtl,
+        k_param_rtl_cone_slope, // 137
 
         //
         // 140: Sensor parameters
@@ -380,6 +382,7 @@ public:
 
     AP_Int16        rtl_altitude;
     AP_Int16        rtl_speed_cms;
+    AP_Float        rtl_cone_slope;
     AP_Float        sonar_gain;
 
     AP_Int8         failsafe_battery_enabled;   // battery failsafe enabled
@@ -448,6 +451,8 @@ public:
     AP_Float        fs_ekf_thresh;
     AP_Int16        gcs_pid_mask;
 
+    AP_Int8         throw_motor_start;
+
 #if FRAME_CONFIG ==     HELI_FRAME
     // Heli
     RC_Channel      heli_servo_1, heli_servo_2, heli_servo_3, heli_servo_4;     // servos for swash plate and tail
@@ -472,16 +477,12 @@ public:
     RC_Channel_aux          rc_6;
     RC_Channel_aux          rc_7;
     RC_Channel_aux          rc_8;
-#if CONFIG_HAL_BOARD == HAL_BOARD_PX4 || CONFIG_HAL_BOARD == HAL_BOARD_VRBRAIN
     RC_Channel_aux          rc_9;
-#endif
     RC_Channel_aux          rc_10;
     RC_Channel_aux          rc_11;
-#if CONFIG_HAL_BOARD == HAL_BOARD_PX4 || CONFIG_HAL_BOARD == HAL_BOARD_VRBRAIN
     RC_Channel_aux          rc_12;
     RC_Channel_aux          rc_13;
     RC_Channel_aux          rc_14;
-#endif
 
     AP_Int16                rc_speed; // speed of fast RC Channels in Hz
 
@@ -550,16 +551,12 @@ public:
         rc_6                (CH_6),
         rc_7                (CH_7),
         rc_8                (CH_8),
-#if CONFIG_HAL_BOARD == HAL_BOARD_PX4 || CONFIG_HAL_BOARD == HAL_BOARD_VRBRAIN
         rc_9                (CH_9),
-#endif
         rc_10               (CH_10),
         rc_11               (CH_11),
-#if CONFIG_HAL_BOARD == HAL_BOARD_PX4 || CONFIG_HAL_BOARD == HAL_BOARD_VRBRAIN
         rc_12               (CH_12),
         rc_13               (CH_13),
         rc_14               (CH_14),
-#endif
 
         // PID controller	    initial P	      initial I         initial D       initial imax        initial filt hz     pid rate
         //---------------------------------------------------------------------------------------------------------------------------------

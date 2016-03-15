@@ -18,11 +18,12 @@
 #include <sys/select.h>
 
 #include <AP_Param/AP_Param.h>
+#include <SITL/SIM_JSBSim.h>
+#include <AP_HAL/utility/Socket.h>
 
 extern const AP_HAL::HAL& hal;
 
 using namespace HALSITL;
-using namespace SITL;
 
 void SITL_State::_set_param_default(const char *parm)
 {
@@ -91,11 +92,13 @@ void SITL_State::_sitl_setup(const char *home_str)
         _update_gps(0, 0, 0, 0, 0, 0, false);
 #endif
         if (enable_gimbal) {
-            gimbal = new Gimbal(_sitl->state);
+            gimbal = new SITL::Gimbal(_sitl->state);
         }
         if (enable_ADSB) {
-            adsb = new ADSB(_sitl->state, home_str);
+            adsb = new SITL::ADSB(_sitl->state, home_str);
         }
+
+        fg_socket.connect("127.0.0.1", 5503);
     }
 
     if (_synthetic_clock_mode) {
@@ -111,34 +114,12 @@ void SITL_State::_sitl_setup(const char *home_str)
  */
 void SITL_State::_setup_fdm(void)
 {
-    int one=1, ret;
-    struct sockaddr_in sockaddr;
-
-    memset(&sockaddr,0,sizeof(sockaddr));
-
-#ifdef HAVE_SOCK_SIN_LEN
-    sockaddr.sin_len = sizeof(sockaddr);
-#endif
-    sockaddr.sin_port = htons(_simin_port);
-    sockaddr.sin_family = AF_INET;
-
-    _sitl_fd = socket(AF_INET, SOCK_DGRAM, 0);
-    if (_sitl_fd == -1) {
-        fprintf(stderr, "SITL: socket failed - %s\n", strerror(errno));
+    if (!_sitl_rc_in.bind("0.0.0.0", _simin_port)) {
+        fprintf(stderr, "SITL: socket bind failed - %s\n", strerror(errno));
         exit(1);
     }
-
-    /* we want to be able to re-use ports quickly */
-    setsockopt(_sitl_fd, SOL_SOCKET, SO_REUSEADDR, &one, sizeof(one));
-
-    ret = bind(_sitl_fd, (struct sockaddr *)&sockaddr, sizeof(sockaddr));
-    if (ret == -1) {
-        fprintf(stderr, "SITL: bind failed on port %u - %s\n",
-                (unsigned)ntohs(sockaddr.sin_port), strerror(errno));
-        exit(1);
-    }
-
-    HALSITL::SITLUARTDriver::_set_nonblocking(_sitl_fd);
+    _sitl_rc_in.reuseaddress();
+    _sitl_rc_in.set_blocking(false);
 }
 #endif
 
@@ -212,16 +193,17 @@ void SITL_State::_fdm_input(void)
 {
     ssize_t size;
     struct pwm_packet {
-        uint16_t pwm[8];
+        uint16_t pwm[16];
     } pwm_pkt;
 
-    size = recv(_sitl_fd, &pwm_pkt, sizeof(pwm_pkt), MSG_DONTWAIT);
+    size = _sitl_rc_in.recv(&pwm_pkt, sizeof(pwm_pkt), 0);
     switch (size) {
-    case sizeof(pwm_pkt): {
+    case 8*2:
+    case 16*2: {
         // a packet giving the receiver PWM inputs
         uint8_t i;
-        for (i=0; i<8; i++) {
-            // setup the pwn input for the RC channel inputs
+        for (i=0; i<size/2; i++) {
+            // setup the pwm input for the RC channel inputs
             if (pwm_pkt.pwm[i] != 0) {
                 pwm_input[i] = pwm_pkt.pwm[i];
             }
@@ -231,13 +213,47 @@ void SITL_State::_fdm_input(void)
     }
 }
 
+/*
+  output current state to flightgear
+ */
+void SITL_State::_output_to_flightgear(void)
+{
+    SITL::FGNetFDM fdm {};
+    const SITL::sitl_fdm &sfdm = _sitl->state;
+
+    fdm.version = 0x18;
+    fdm.padding = 0;
+    fdm.longitude = radians(sfdm.longitude);
+    fdm.latitude = radians(sfdm.latitude);
+    fdm.altitude = sfdm.altitude;
+    fdm.agl = sfdm.altitude;
+    fdm.phi   = radians(sfdm.rollDeg);
+    fdm.theta = radians(sfdm.pitchDeg);
+    fdm.psi   = radians(sfdm.yawDeg);
+    if (_vehicle == ArduCopter) {
+        fdm.num_engines = 4;
+        for (uint8_t i=0; i<4; i++) {
+            fdm.rpm[i] = constrain_float((pwm_output[i]-1000), 0, 1000);
+        }
+    } else {
+        fdm.num_engines = 4;
+        fdm.rpm[0] = constrain_float((pwm_output[2]-1000)*3, 0, 3000);
+        // for quadplane
+        fdm.rpm[1] = constrain_float((pwm_output[5]-1000)*12, 0, 12000);
+        fdm.rpm[2] = constrain_float((pwm_output[6]-1000)*12, 0, 12000);
+        fdm.rpm[3] = constrain_float((pwm_output[7]-1000)*12, 0, 12000);
+    }
+    fdm.ByteSwap();
+
+    fg_socket.send(&fdm, sizeof(fdm));
+}
 
 /*
   get FDM input from a local model
  */
 void SITL_State::_fdm_input_local(void)
 {
-    Aircraft::sitl_input input;
+    SITL::Aircraft::sitl_input input;
 
     // check for direct RC input
     _fdm_input();
@@ -258,6 +274,8 @@ void SITL_State::_fdm_input_local(void)
     if (adsb != NULL) {
         adsb->update();
     }
+
+    _output_to_flightgear();
 
     // update simulation time
     hal.scheduler->stop_clock(_sitl->state.timestamp_us);
@@ -296,7 +314,7 @@ void SITL_State::_apply_servo_filter(float deltat)
 /*
   create sitl_input structure for sending to FDM
  */
-void SITL_State::_simulator_servos(Aircraft::sitl_input &input)
+void SITL_State::_simulator_servos(SITL::Aircraft::sitl_input &input)
 {
     static uint32_t last_update_usec;
 
@@ -386,10 +404,10 @@ void SITL_State::_simulator_servos(Aircraft::sitl_input &input)
         // simulate simple battery setup
         float throttle = _sitl->motors_on?(input.servos[2]-1000) / 1000.0f:0;
         // lose 0.7V at full throttle
-        voltage = _sitl->batt_voltage - 0.7f*throttle;
+        voltage = _sitl->batt_voltage - 0.7f*fabsf(throttle);
 
         // assume 50A at full throttle
-        _current = 50.0f * throttle;
+        _current = 50.0f * fabsf(throttle);
     } else {
         // FDM provides voltage and current
         voltage = _sitl->state.battery_voltage;
@@ -427,7 +445,7 @@ void SITL_State::init(int argc, char * const argv[])
     pwm_input[4] = pwm_input[7] = 1800;
     pwm_input[2] = pwm_input[5] = pwm_input[6] = 1000;
 
-    _scheduler = SITLScheduler::from(hal.scheduler);
+    _scheduler = Scheduler::from(hal.scheduler);
     _parse_command_line(argc, argv);
 }
 

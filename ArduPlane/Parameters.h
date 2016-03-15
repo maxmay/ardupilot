@@ -147,6 +147,8 @@ public:
         k_param_arming = 100,
         k_param_parachute_channel,
         k_param_crash_accel_threshold,
+        k_param_override_safety,
+        k_param_land_throttle_slewrate, // 104
 
         // 105: Extra parameters
         k_param_fence_retalt = 105,
@@ -177,6 +179,7 @@ public:
         k_param_acro_roll_rate,
         k_param_acro_pitch_rate,
         k_param_acro_locking,
+        k_param_use_reverse_thrust = 129,
 
         //
         // 130: Sensor parameters
@@ -200,6 +203,8 @@ public:
         k_param_mission, // mission library
         k_param_serial_manager, // serial manager library
         k_param_NavEKF2,  // EKF2
+        k_param_land_pre_flare_alt,
+        k_param_land_pre_flare_airspeed = 149,
 
         //
         // 150: Navigation parameters
@@ -224,6 +229,7 @@ public:
         k_param_camera_mount2,      // unused
         k_param_adsb,
         k_param_notify,
+        k_param_land_pre_flare_sec = 165,
 
         //
         // Battery monitoring parameters
@@ -276,6 +282,9 @@ public:
         k_param_kff_pitch_to_throttle, // unused
         k_param_kff_throttle_to_pitch,
         k_param_scaling_speed,
+        k_param_quadplane,
+        k_param_rtl_radius,
+        k_param_land_then_servos_neutral,
 
         //
         // 210: flight modes
@@ -382,6 +391,7 @@ public:
     AP_Int16 waypoint_radius;
     AP_Int16 waypoint_max_radius;
     AP_Int16 loiter_radius;
+    AP_Int16 rtl_radius;
 
 #if GEOFENCE_ENABLED == ENABLED
     AP_Int8 fence_action;
@@ -406,6 +416,7 @@ public:
     AP_Int8 throttle_fs_enabled;
     AP_Int16 throttle_fs_value;
     AP_Int8 throttle_nudge;
+    AP_Int16 use_reverse_thrust;
 
     // Failsafe
     AP_Int8 short_fs_action;
@@ -454,7 +465,10 @@ public:
     AP_Int32 RTL_altitude_cm;
     AP_Float land_flare_alt;
     AP_Int8 land_disarm_delay;
+    AP_Int8 land_then_servos_neutral;
     AP_Int8 land_abort_throttle_enable;
+    AP_Float land_pre_flare_alt;
+    AP_Float land_pre_flare_sec;
     AP_Int32 min_gndspeed_cm;
     AP_Int16 pitch_trim_cd;
     AP_Int16 FBWB_min_altitude_cm;
@@ -479,6 +493,7 @@ public:
     AP_Float takeoff_tdrag_speed1;
     AP_Float takeoff_rotate_speed;
     AP_Int8 takeoff_throttle_slewrate;
+    AP_Int8 land_throttle_slewrate;
     AP_Int8 level_roll_limit;
     AP_Int8 flapin_channel;
     AP_Int8 flaperon_output;
@@ -493,6 +508,7 @@ public:
     AP_Int8 flap_slewrate;
 #if CONFIG_HAL_BOARD == HAL_BOARD_PX4
     AP_Int8 override_channel;
+    AP_Int8 override_safety;
 #endif
     AP_Int16 gcs_pid_mask;
     AP_Int8 parachute_channel;
@@ -506,14 +522,12 @@ public:
     RC_Channel_aux rc_6;
     RC_Channel_aux rc_7;
     RC_Channel_aux rc_8;
-#if CONFIG_HAL_BOARD == HAL_BOARD_PX4 || CONFIG_HAL_BOARD == HAL_BOARD_VRBRAIN
     RC_Channel_aux rc_9;
     RC_Channel_aux rc_10;
     RC_Channel_aux rc_11;
     RC_Channel_aux rc_12;
     RC_Channel_aux rc_13;
     RC_Channel_aux rc_14;
-#endif
     uint8_t _dummy;
 
     Parameters() :
@@ -527,14 +541,12 @@ public:
         rc_6                                    (CH_6),
         rc_7                                    (CH_7),
         rc_8                                    (CH_8),
-#if CONFIG_HAL_BOARD == HAL_BOARD_PX4 || CONFIG_HAL_BOARD == HAL_BOARD_VRBRAIN
         rc_9                                    (CH_9),
         rc_10                                   (CH_10),
         rc_11                                   (CH_11),
         rc_12                                   (CH_12),
         rc_13                                   (CH_13),
         rc_14                                   (CH_14),
-#endif
         _dummy(0)
         {}
 };

@@ -2,6 +2,10 @@
 
 [![Gitter](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/diydrones/ardupilot?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
+[![Build SemaphoreCI](https://semaphoreci.com/api/v1/projects/4d28a40d-b6a6-4bfb-9780-95d92aabb178/667563/badge.svg)](https://semaphoreci.com/diydrones/ardupilot)
+
+[![Build Travis](https://travis-ci.org/diydrones/ardupilot.svg?branch=master)](https://travis-ci.org/diydrones/ardupilot)
+
 ### The ArduPilot project is made up of: ###
 >>ArduCopter (or APM:Copter) : [code](https://github.com/diydrones/ardupilot/tree/master/ArduCopter), [wiki](http://copter.ardupilot.com)
 
@@ -9,7 +13,7 @@
 
 >>ArduRover (or APMrover2) : [code](https://github.com/diydrones/ardupilot/tree/master/APMrover2), [wiki](http://rover.ardupilot.com)
 
->>Antenna Tracker : [code](https://github.com/diydrones/ardupilot/tree/master/AntennaTracker), [wiki](http://copter.ardupilot.com/wiki/common-antennatracker-introduction)
+>>Antenna Tracker : [code](https://github.com/diydrones/ardupilot/tree/master/AntennaTracker), [wiki](http://antennatracker.ardupilot.com)
 
 ### User Support & Discussion Forums ###
 >>APM Forum: [http://ardupilot.com/forum/index.php](http://ardupilot.com/forum/index.php)
@@ -80,7 +84,7 @@
 >> - [Michael du Breuil](https://github.com/WickedShell)
 >>   - ***Subsystem***: uBlox GPS
 >> - [Víctor Mayoral Vilches](https://github.com/vmayoral)
->>   - ***Board***: PXF
+>>   - ***Board***: PXF, Erle-Brain 2, PXFmini
 >> - [Mirko Denecke](https://github.com/mirkix)
 >>   - ***Board***: BBBmini
 >> - [Georgii Staroselskii](https://github.com/staroselskii)
@@ -91,9 +95,15 @@
 >>   - ***Board***: VRBrain
 >> - [Mike McCauley](#)
 >>   - ***Board***: Flymaple
+>> - [Julien BERAUD](https://github.com/jberaud)
+>>   - ***Board***: Bebop & Bebop 2
+>> - [Pritam Ghanghas](https://github.com/pritamghanghas)
+>>   - ***Board***: Raspilot
 >> - [Jonathan Challinger] (https://github.com/3drobotics/ardupilot-solo)
 >>   - ***Vehicle***: 3DRobotics Solo ArduPilot maintainer
 >> - [Gustavo José de Sousa](https://github.com/guludo)
 >>   - ***Subsystem***: Build system
 >> - [Craig Elder] (https://github.com/CraigElder)
 >>   - ***Administration***: Dronecode Technical Community Manager
+>> - [Tom Pittenger] (https://github.com/magicrub)
+>>   - ***Vehicle***: Plane

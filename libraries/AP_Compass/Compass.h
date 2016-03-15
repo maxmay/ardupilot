@@ -1,6 +1,5 @@
 /// -*- tab-width: 4; Mode: C++; c-basic-offset: 4; indent-tabs-mode: nil -*-
-#ifndef Compass_h
-#define Compass_h
+#pragma once
 
 #include <inttypes.h>
 #include <GCS_MAVLink/GCS_MAVLink.h>
@@ -33,6 +32,9 @@
 # define MAG_BOARD_ORIENTATION ROTATION_ROLL_180
 #elif CONFIG_HAL_BOARD == HAL_BOARD_LINUX && CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_BEBOP
 # define MAG_BOARD_ORIENTATION ROTATION_YAW_90
+#elif CONFIG_HAL_BOARD == HAL_BOARD_LINUX && (CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_ERLEBRAIN2 || \
+      CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_PXFMINI)
+# define MAG_BOARD_ORIENTATION ROTATION_YAW_270
 #else
 # define MAG_BOARD_ORIENTATION ROTATION_NONE
 #endif
@@ -414,4 +416,3 @@ private:
 #include "AP_Compass_LSM303D.h"
 #include "AP_Compass_qflight.h"
 #include "AP_Compass_QURT.h"
-#endif

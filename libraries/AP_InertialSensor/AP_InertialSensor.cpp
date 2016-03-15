@@ -2,13 +2,26 @@
 
 #include <assert.h>
 
-#include "AP_InertialSensor.h"
-
 #include <AP_Common/AP_Common.h>
 #include <AP_HAL/AP_HAL.h>
+#include <AP_HAL/I2CDevice.h>
+#include <AP_HAL/SPIDevice.h>
+#include <AP_Math/AP_Math.h>
 #include <AP_Notify/AP_Notify.h>
 #include <AP_Vehicle/AP_Vehicle.h>
-#include <AP_Math/AP_Math.h>
+
+#include "AP_InertialSensor.h"
+#include "AP_InertialSensor_Backend.h"
+#include "AP_InertialSensor_Flymaple.h"
+#include "AP_InertialSensor_HIL.h"
+#include "AP_InertialSensor_L3G4200D.h"
+#include "AP_InertialSensor_LSM9DS0.h"
+#include "AP_InertialSensor_MPU6000.h"
+#include "AP_InertialSensor_MPU9250.h"
+#include "AP_InertialSensor_PX4.h"
+#include "AP_InertialSensor_QURT.h"
+#include "AP_InertialSensor_SITL.h"
+#include "AP_InertialSensor_qflight.h"
 
 /*
   enable TIMING_DEBUG to track down scheduling issues with the main
@@ -45,7 +58,7 @@ extern const AP_HAL::HAL& hal;
 const AP_Param::GroupInfo AP_InertialSensor::var_info[] = {
     // @Param: PRODUCT_ID
     // @DisplayName: IMU Product ID
-    // @Description: Which type of IMU is installed (read-only). 
+    // @Description: Which type of IMU is installed (read-only).
     // @User: Advanced
     // @Values: 0:Unknown,1:APM1-1280,2:APM1-2560,88:APM2,3:SITL,4:PX4v1,5:PX4v2,256:Flymaple,257:Linux
     AP_GROUPINFO("PRODUCT_ID",  0, AP_InertialSensor, _product_id,   0),
@@ -333,13 +346,15 @@ AP_InertialSensor::AP_InertialSensor() :
     _log_raw_data(false),
     _backends_detected(false),
     _dataflash(NULL),
-    _accel_cal_requires_reboot(false)
+    _accel_cal_requires_reboot(false),
+    _startup_error_counts_set(false),
+    _startup_ms(0)
 {
     if (_s_instance) {
         AP_HAL::panic("Too many inertial sensors");
     }
     _s_instance = this;
-    AP_Param::setup_object_defaults(this, var_info);        
+    AP_Param::setup_object_defaults(this, var_info);
     for (uint8_t i=0; i<INS_MAX_BACKENDS; i++) {
         _backends[i] = NULL;
     }
@@ -358,8 +373,12 @@ AP_InertialSensor::AP_InertialSensor() :
         _delta_velocity_acc_dt[i] = 0;
 
         _delta_angle_acc[i].zero();
+        _delta_angle_acc_dt[i] = 0;
         _last_delta_angle[i].zero();
         _last_raw_gyro[i].zero();
+
+        _accel_startup_error_count[i] = 0;
+        _gyro_startup_error_count[i] = 0;
     }
     for (uint8_t i=0; i<INS_VIBRATION_CHECK_INSTANCES; i++) {
         _accel_vibe_floor_filter[i].set_cutoff_frequency(AP_INERTIAL_SENSOR_ACCEL_VIBE_FLOOR_FILT_HZ);
@@ -367,6 +386,8 @@ AP_InertialSensor::AP_InertialSensor() :
     }
     memset(_delta_velocity_valid,0,sizeof(_delta_velocity_valid));
     memset(_delta_angle_valid,0,sizeof(_delta_angle_valid));
+
+    AP_AccelCal::register_client(this);
 }
 
 /*
@@ -501,34 +522,34 @@ AP_InertialSensor::detect_backends(void)
         return;
     }
 #if CONFIG_HAL_BOARD == HAL_BOARD_SITL
-    _add_backend(AP_InertialSensor_SITL::detect(*this));    
+    _add_backend(AP_InertialSensor_SITL::detect(*this));
 #elif HAL_INS_DEFAULT == HAL_INS_HIL
     _add_backend(AP_InertialSensor_HIL::detect(*this));
 #elif HAL_INS_DEFAULT == HAL_INS_MPU60XX_SPI
-    _add_backend(AP_InertialSensor_MPU6000::detect_spi(*this));
+    _add_backend(AP_InertialSensor_MPU6000::probe(*this, hal.spi->get_device(HAL_INS_MPU60x0_NAME)));
+#elif HAL_INS_DEFAULT == HAL_INS_MPU60XX_I2C
+    _add_backend(AP_InertialSensor_MPU6000::probe(*this, hal.i2c_mgr->get_device(HAL_INS_MPU60x0_I2C_BUS, HAL_INS_MPU60x0_I2C_ADDR)));
 #elif HAL_INS_DEFAULT == HAL_INS_BH
-    _add_backend(AP_InertialSensor_MPU6000::detect_i2c(*this, hal.i2c, HAL_INS_MPU60XX_I2C_ADDR));
-    _add_backend(AP_InertialSensor_MPU9250::detect(*this, hal.spi->device(AP_HAL::SPIDevice_MPU9250)));
-#elif HAL_INS_DEFAULT == HAL_INS_MPU60XX_I2C && HAL_INS_MPU60XX_I2C_BUS == 2
-    _add_backend(AP_InertialSensor_MPU6000::detect_i2c(*this, hal.i2c2, HAL_INS_MPU60XX_I2C_ADDR));
+    _add_backend(AP_InertialSensor_MPU6000::probe(*this, hal.i2c_mgr->get_device(HAL_INS_MPU60x0_I2C_BUS, HAL_INS_MPU60x0_I2C_ADDR)));
+    _add_backend(AP_InertialSensor_MPU9250::probe(*this, hal.spi->get_device(HAL_INS_MPU9250_NAME)));
 #elif HAL_INS_DEFAULT == HAL_INS_PX4 || HAL_INS_DEFAULT == HAL_INS_VRBRAIN
     _add_backend(AP_InertialSensor_PX4::detect(*this));
-#elif HAL_INS_DEFAULT == HAL_INS_MPU9250
-    _add_backend(AP_InertialSensor_MPU9250::detect(*this, hal.spi->device(AP_HAL::SPIDevice_MPU9250)));
+#elif HAL_INS_DEFAULT == HAL_INS_MPU9250_SPI
+    _add_backend(AP_InertialSensor_MPU9250::probe(*this, hal.spi->get_device(HAL_INS_MPU9250_NAME)));
 #elif HAL_INS_DEFAULT == HAL_INS_FLYMAPLE
     _add_backend(AP_InertialSensor_Flymaple::detect(*this));
 #elif HAL_INS_DEFAULT == HAL_INS_LSM9DS0
-    _add_backend(AP_InertialSensor_LSM9DS0::detect(*this));
+    _add_backend(AP_InertialSensor_LSM9DS0::probe(*this,
+                 hal.spi->get_device(HAL_INS_LSM9DS0_G_NAME),
+                 hal.spi->get_device(HAL_INS_LSM9DS0_A_NAME)));
 #elif HAL_INS_DEFAULT == HAL_INS_L3G4200D
-    _add_backend(AP_InertialSensor_L3G4200D::detect(*this));
+    _add_backend(AP_InertialSensor_L3G4200D::probe(*this, hal.i2c_mgr->get_device(HAL_INS_L3G4200D_I2C_BUS, HAL_INS_L3G4200D_I2C_ADDR));
 #elif HAL_INS_DEFAULT == HAL_INS_RASPILOT
     //_add_backend(AP_InertialSensor_L3GD20::detect);
     //_add_backend(AP_InertialSensor_LSM303D::detect);
-    _add_backend(AP_InertialSensor_MPU6000::detect_spi(*this));
+    _add_backend(AP_InertialSensor_MPU6000::probe(*this, hal.spi->get_device(HAL_INS_MPU60x0_NAME)));
 #elif HAL_INS_DEFAULT == HAL_INS_MPU9250_I2C
-    _add_backend(AP_InertialSensor_MPU9250::detect_i2c(*this,
-                                                       HAL_INS_MPU9250_I2C_POINTER,
-                                                       HAL_INS_MPU9250_I2C_ADDR));
+    _add_backend(AP_InertialSensor_MPU9250::probe(*this, hal.i2c_mgr->get_device(HAL_INS_MPU9250_I2C_BUS, HAL_INS_MPU9250_I2C_ADDR));
 #elif HAL_INS_DEFAULT == HAL_INS_QFLIGHT
     _add_backend(AP_InertialSensor_QFLIGHT::detect(*this));
 #elif HAL_INS_DEFAULT == HAL_INS_QURT
@@ -548,13 +569,13 @@ AP_InertialSensor::detect_backends(void)
 /*
   _calculate_trim - calculates the x and y trim angles. The
   accel_sample must be correctly scaled, offset and oriented for the
-  board 
+  board
 */
 bool AP_InertialSensor::_calculate_trim(const Vector3f &accel_sample, float& trim_roll, float& trim_pitch)
 {
     trim_pitch = atan2f(accel_sample.x, pythagorous2(accel_sample.y, accel_sample.z));
     trim_roll = atan2f(-accel_sample.y, -accel_sample.z);
-    if (fabsf(trim_roll) > radians(10) || 
+    if (fabsf(trim_roll) > radians(10) ||
         fabsf(trim_pitch) > radians(10)) {
         hal.console->println("trim over maximum of 10 degrees");
         return false;
@@ -679,7 +700,7 @@ bool AP_InertialSensor::calibrate_trim(float &trim_roll, float &trim_pitch)
 
 failed:
     _calibrating = false;
-    return false;    
+    return false;
 }
 
 /*
@@ -911,27 +932,50 @@ void AP_InertialSensor::update(void)
             _delta_velocity_acc[i].zero();
             _delta_velocity_acc_dt[i] = 0;
             _delta_angle_acc[i].zero();
+            _delta_angle_acc_dt[i] = 0;
+        }
+
+        if (!_startup_error_counts_set) {
+            for (uint8_t i=0; i<INS_MAX_INSTANCES; i++) {
+                _accel_startup_error_count[i] = _accel_error_count[i];
+                _gyro_startup_error_count[i] = _gyro_error_count[i];
+            }
+
+            if (_startup_ms == 0) {
+                _startup_ms = AP_HAL::millis();
+            } else if (AP_HAL::millis()-_startup_ms > 2000) {
+                _startup_error_counts_set = true;
+            }
+        }
+
+        for (uint8_t i=0; i<INS_MAX_INSTANCES; i++) {
+            if (_accel_error_count[i] < _accel_startup_error_count[i]) {
+                _accel_startup_error_count[i] = _accel_error_count[i];
+            }
+            if (_gyro_error_count[i] < _gyro_startup_error_count[i]) {
+                _gyro_startup_error_count[i] = _gyro_error_count[i];
+            }
         }
 
         // adjust health status if a sensor has a non-zero error count
-        // but another sensor doesn't. 
+        // but another sensor doesn't.
         bool have_zero_accel_error_count = false;
         bool have_zero_gyro_error_count = false;
         for (uint8_t i=0; i<INS_MAX_INSTANCES; i++) {
-            if (_accel_healthy[i] && _accel_error_count[i] == 0) {
+            if (_accel_healthy[i] && _accel_error_count[i] <= _accel_startup_error_count[i]) {
                 have_zero_accel_error_count = true;
             }
-            if (_gyro_healthy[i] && _gyro_error_count[i] == 0) {
+            if (_gyro_healthy[i] && _gyro_error_count[i] <= _gyro_startup_error_count[i]) {
                 have_zero_gyro_error_count = true;
             }
         }
 
         for (uint8_t i=0; i<INS_MAX_INSTANCES; i++) {
-            if (_gyro_healthy[i] && _gyro_error_count[i] != 0 && have_zero_gyro_error_count) {
+            if (_gyro_healthy[i] && _gyro_error_count[i] > _gyro_startup_error_count[i] && have_zero_gyro_error_count) {
                 // we prefer not to use a gyro that has had errors
                 _gyro_healthy[i] = false;
             }
-            if (_accel_healthy[i] && _accel_error_count[i] != 0 && have_zero_accel_error_count) {
+            if (_accel_healthy[i] && _accel_error_count[i] > _accel_startup_error_count[i] && have_zero_accel_error_count) {
                 // we prefer not to use a accel that has had errors
                 _accel_healthy[i] = false;
             }
@@ -957,10 +1001,10 @@ void AP_InertialSensor::update(void)
 
 /*
   wait for a sample to be available. This is the function that
-  determines the timing of the main loop in ardupilot. 
+  determines the timing of the main loop in ardupilot.
 
   Ideally this function would return at exactly the rate given by the
-  sample_rate argument given to AP_InertialSensor::init(). 
+  sample_rate argument given to AP_InertialSensor::init().
 
   The key output of this function is _delta_time, which is the time
   over which the gyro and accel integration will happen for this
@@ -995,7 +1039,7 @@ void AP_InertialSensor::wait_for_sample(void)
             timing_printf("shortsleep %u\n", (unsigned)(_next_sample_usec-now2));
         }
         if (now2 > _next_sample_usec+400) {
-            timing_printf("longsleep %u wait_usec=%u\n", 
+            timing_printf("longsleep %u wait_usec=%u\n",
                           (unsigned)(now2-_next_sample_usec),
                           (unsigned)wait_usec);
         }
@@ -1052,7 +1096,7 @@ check_sample:
         if (counter++ == 400) {
             counter = 0;
             hal.console->printf("now=%lu _delta_time_sum=%lu diff=%ld\n",
-                                (unsigned long)now, 
+                                (unsigned long)now,
                                 (unsigned long)delta_time_sum,
                                 (long)(now - delta_time_sum));
         }
@@ -1066,7 +1110,7 @@ check_sample:
 /*
   get delta angles
  */
-bool AP_InertialSensor::get_delta_angle(uint8_t i, Vector3f &delta_angle) const 
+bool AP_InertialSensor::get_delta_angle(uint8_t i, Vector3f &delta_angle) const
 {
     if (_delta_angle_valid[i]) {
         delta_angle = _delta_angle[i];
@@ -1102,6 +1146,17 @@ float AP_InertialSensor::get_delta_velocity_dt(uint8_t i) const
 {
     if (_delta_velocity_valid[i]) {
         return _delta_velocity_dt[i];
+    }
+    return get_delta_time();
+}
+
+/*
+  return delta_time for the delta_angle
+ */
+float AP_InertialSensor::get_delta_angle_dt(uint8_t i) const
+{
+    if (_delta_angle_valid[i]) {
+        return _delta_angle_dt[i];
     }
     return get_delta_time();
 }
@@ -1266,12 +1321,10 @@ void AP_InertialSensor::acal_init()
     if (_accel_calibrator == NULL) {
         _accel_calibrator = new AccelCalibrator[INS_MAX_INSTANCES];
     }
-
-    _acal->register_client(this);
 }
 
 // update accel calibrator
-void AP_InertialSensor::acal_update() 
+void AP_InertialSensor::acal_update()
 {
     if(_acal == NULL) {
         return;
@@ -1321,7 +1374,7 @@ void AP_InertialSensor::_acal_save_calibrations()
                 // determine trim from aligned sample vs misaligned sample
                 Vector3f cross = (misaligned_sample%aligned_sample);
                 float dot = (misaligned_sample*aligned_sample);
-                Quaternion q(sqrt(sq(misaligned_sample.length())*sq(aligned_sample.length()))+dot, cross.x, cross.y, cross.z);
+                Quaternion q(safe_sqrt(sq(misaligned_sample.length())*sq(aligned_sample.length()))+dot, cross.x, cross.y, cross.z);
                 q.normalize();
                 _trim_roll = q.get_euler_roll();
                 _trim_pitch = q.get_euler_pitch();
@@ -1330,13 +1383,13 @@ void AP_InertialSensor::_acal_save_calibrations()
             break;
         default:
             _new_trim = false;
-            //noop
+            /* no break */
     }
 
-    if (fabsf(_trim_roll) > radians(10) || 
+    if (fabsf(_trim_roll) > radians(10) ||
         fabsf(_trim_pitch) > radians(10)) {
         hal.console->print("ERR: Trim over maximum of 10 degrees!!");
-        _new_trim = false;  //we have either got faulty level during acal or highly misaligned accelerometers 
+        _new_trim = false;  //we have either got faulty level during acal or highly misaligned accelerometers
     }
 
     _accel_cal_requires_reboot = true;
@@ -1351,7 +1404,7 @@ void AP_InertialSensor::_acal_event_failure()
 }
 
 /*
-    Returns true if new valid trim values are available and passes them to reference vars    
+    Returns true if new valid trim values are available and passes them to reference vars
 */
 bool AP_InertialSensor::get_new_trim(float& trim_roll, float &trim_pitch)
 {
@@ -1364,7 +1417,7 @@ bool AP_InertialSensor::get_new_trim(float& trim_roll, float &trim_pitch)
     return false;
 }
 
-/*    
+/*
     Returns body fixed accelerometer level data averaged during accel calibration's first step
 */
 bool AP_InertialSensor::get_fixed_mount_accel_cal_sample(uint8_t sample_num, Vector3f& ret) const
@@ -1377,7 +1430,7 @@ bool AP_InertialSensor::get_fixed_mount_accel_cal_sample(uint8_t sample_num, Vec
     return true;
 }
 
-/*    
+/*
     Returns Primary accelerometer level data averaged during accel calibration's first step
 */
 bool AP_InertialSensor::get_primary_accel_cal_sample_avg(uint8_t sample_num, Vector3f& ret) const

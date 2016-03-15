@@ -70,6 +70,7 @@ public:
         GPS_TYPE_SBF   = 10,
 		GPS_TYPE_GSOF  = 11,
 		GPS_TYPE_QURT  = 12,
+        GPS_TYPE_ERB = 13,
     };
 
     /// GPS status codes
@@ -95,6 +96,10 @@ public:
         GPS_ENGINE_AIRBORNE_2G = 7,
         GPS_ENGINE_AIRBORNE_4G = 8
     };
+
+   enum GPS_Config {
+       GPS_ALL_CONFIGURED = 255
+   };
 
     /*
       The GPS_State structure is filled in by the backend driver as it
@@ -317,8 +322,9 @@ public:
     AP_Int8 _sbas_mode;
     AP_Int8 _min_elevation;
     AP_Int8 _raw_data;
-    AP_Int8 _gnss_mode;
+    AP_Int8 _gnss_mode[2];
     AP_Int8 _save_config;
+    AP_Int8 _auto_config;
     
     // handle sending of initialisation strings to the GPS
     void send_blob_start(uint8_t instance, const char *_blob, uint16_t size);
@@ -337,6 +343,9 @@ public:
 
     void send_mavlink_gps_rtk(mavlink_channel_t chan);
     void send_mavlink_gps2_rtk(mavlink_channel_t chan);
+
+    // Returns the index of the first unconfigured GPS (returns GPS_ALL_CONFIGURED if all instances report as being configured)
+    uint8_t first_unconfigured_gps(void) const;
 
 private:
     struct GPS_timing {
@@ -371,6 +380,7 @@ private:
         struct SIRF_detect_state sirf_detect_state;
         struct NMEA_detect_state nmea_detect_state;
         struct SBP_detect_state sbp_detect_state;
+        struct ERB_detect_state erb_detect_state;
     } detect_state[GPS_MAX_INSTANCES];
 
     struct {
@@ -384,6 +394,7 @@ private:
 
     void detect_instance(uint8_t instance);
     void update_instance(uint8_t instance);
+    void _broadcast_gps_type(const char *type, uint8_t instance, int8_t baud_index);
 };
 
 #define GPS_BAUD_TIME_MS 1200
@@ -399,5 +410,6 @@ private:
 #include "AP_GPS_QURT.h"
 #include "AP_GPS_SBF.h"
 #include "AP_GPS_GSOF.h"
+#include "AP_GPS_ERB.h"
 
 #endif // __AP_GPS_H__

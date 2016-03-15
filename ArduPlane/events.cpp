@@ -27,6 +27,13 @@ void Plane::failsafe_short_on_event(enum failsafe_state fstype)
         }
         break;
 
+    case QSTABILIZE:
+    case QLOITER:
+        failsafe.saved_mode = control_mode;
+        failsafe.saved_mode_set = 1;
+        set_mode(QHOVER);
+        break;
+        
     case AUTO:
     case GUIDED:
     case LOITER:
@@ -43,6 +50,7 @@ void Plane::failsafe_short_on_event(enum failsafe_state fstype)
 
     case CIRCLE:
     case RTL:
+    case QHOVER:
     default:
         break;
     }
@@ -67,17 +75,30 @@ void Plane::failsafe_long_on_event(enum failsafe_state fstype)
     case CRUISE:
     case TRAINING:
     case CIRCLE:
-        if(g.long_fs_action == 2) {
+        if(g.long_fs_action == 3) {
+#if PARACHUTE == ENABLED
+            parachute_release();
+#endif
+        } else if (g.long_fs_action == 2) {
             set_mode(FLY_BY_WIRE_A);
         } else {
             set_mode(RTL);
         }
         break;
 
+    case QSTABILIZE:
+    case QLOITER:
+        set_mode(QHOVER);
+        break;
+        
     case AUTO:
     case GUIDED:
     case LOITER:
-        if(g.long_fs_action == 2) {
+        if(g.long_fs_action == 3) {
+#if PARACHUTE == ENABLED
+            parachute_release();
+#endif
+        } else if (g.long_fs_action == 2) {
             set_mode(FLY_BY_WIRE_A);
         } else if (g.long_fs_action == 1) {
             set_mode(RTL);
@@ -85,6 +106,7 @@ void Plane::failsafe_long_on_event(enum failsafe_state fstype)
         break;
 
     case RTL:
+    case QHOVER:
     default:
         break;
     }
@@ -116,6 +138,7 @@ void Plane::low_battery_event(void)
     gcs_send_text_fmt(MAV_SEVERITY_WARNING, "Low battery %.2fV used %.0f mAh",
                       (double)battery.voltage(), (double)battery.current_total_mah());
     if (flight_stage != AP_SpdHgtControl::FLIGHT_LAND_FINAL &&
+        flight_stage != AP_SpdHgtControl::FLIGHT_LAND_PREFLARE &&
         flight_stage != AP_SpdHgtControl::FLIGHT_LAND_APPROACH) {
     	set_mode(RTL);
     	aparm.throttle_cruise.load();

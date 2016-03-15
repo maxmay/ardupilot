@@ -125,6 +125,7 @@ protected:
     uint8_t instance;
     const char *autotest_dir;
     const char *frame;
+    bool use_time_sync = true;
 
     bool on_ground(const Vector3f &pos) const;
 
@@ -159,6 +160,7 @@ protected:
 private:
     uint64_t last_time_us = 0;
     uint32_t frame_counter = 0;
+    uint32_t last_ground_contact_ms;
     const uint32_t min_sleep_time;
 };
 

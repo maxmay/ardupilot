@@ -94,6 +94,9 @@ void Copter::init_ardupilot()
     // initialise serial port
     serial_manager.init_console();
 
+    // init vehicle capabilties
+    init_capabilities();
+
     cliSerial->printf("\n\nInit " FIRMWARE_STRING
                          "\n\nFree RAM: %u\n",
                       (unsigned)hal.util->available_memory());
@@ -162,6 +165,8 @@ void Copter::init_ardupilot()
     log_init();
 #endif
 
+    GCS_MAVLINK::set_dataflash(&DataFlash);
+
     // update motor interlock state
     update_using_interlock();
 
@@ -204,7 +209,7 @@ void Copter::init_ardupilot()
 
 #if MOUNT == ENABLED
     // initialise camera mount
-    camera_mount.init(serial_manager);
+    camera_mount.init(&DataFlash, serial_manager);
 #endif
 
 #if PRECISION_LANDING == ENABLED
@@ -277,9 +282,6 @@ void Copter::init_ardupilot()
 
     ins.set_raw_logging(should_log(MASK_LOG_IMU_RAW));
     ins.set_dataflash(&DataFlash);
-
-    // init vehicle capabilties
-    init_capabilities();
 
     cliSerial->print("\nReady to FLY ");
 
@@ -405,7 +407,8 @@ void Copter::update_auto_armed()
         }
 #else
         // if motors are armed and throttle is above zero auto_armed should be true
-        if(motors.armed() && !ap.throttle_zero) {
+        // if motors are armed and we are in throw mode, then auto_ermed should be true
+        if(motors.armed() && (!ap.throttle_zero || control_mode == THROW)) {
             set_auto_armed(true);
         }
 #endif // HELI_FRAME

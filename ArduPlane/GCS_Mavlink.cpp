@@ -39,6 +39,9 @@ void Plane::send_heartbeat(mavlink_channel_t chan)
     case FLY_BY_WIRE_A:
     case AUTOTUNE:
     case FLY_BY_WIRE_B:
+    case QSTABILIZE:
+    case QHOVER:
+    case QLOITER:
     case CRUISE:
         base_mode = MAV_MODE_FLAG_STABILIZE_ENABLED;
         break;
@@ -147,6 +150,10 @@ void Plane::send_extended_status1(mavlink_channel_t chan)
         control_sensors_present |= MAV_SYS_STATUS_GEOFENCE;
     }
 
+    if (aparm.throttle_min < 0) {
+        control_sensors_present |= MAV_SYS_STATUS_REVERSE_MOTOR;
+    }
+
     // all present sensors enabled by default except rate control, attitude stabilization, yaw, altitude, position control, geofence and motor output which we will set individually
     control_sensors_enabled = control_sensors_present & (~MAV_SYS_STATUS_SENSOR_ANGULAR_RATE_CONTROL & ~MAV_SYS_STATUS_SENSOR_ATTITUDE_STABILIZATION & ~MAV_SYS_STATUS_SENSOR_YAW_POSITION & ~MAV_SYS_STATUS_SENSOR_Z_ALTITUDE_CONTROL & ~MAV_SYS_STATUS_SENSOR_XY_POSITION_CONTROL & ~MAV_SYS_STATUS_SENSOR_MOTOR_OUTPUTS & ~MAV_SYS_STATUS_GEOFENCE);
 
@@ -169,6 +176,9 @@ void Plane::send_extended_status1(mavlink_channel_t chan)
     case STABILIZE:
     case FLY_BY_WIRE_A:
     case AUTOTUNE:
+    case QSTABILIZE:
+    case QHOVER:
+    case QLOITER:
         control_sensors_enabled |= MAV_SYS_STATUS_SENSOR_ANGULAR_RATE_CONTROL; // 3D angular rate control
         control_sensors_enabled |= MAV_SYS_STATUS_SENSOR_ATTITUDE_STABILIZATION; // attitude stabilisation
         break;
@@ -293,6 +303,11 @@ void Plane::send_extended_status1(mavlink_channel_t chan)
         }
     }
 #endif
+
+    if (aparm.throttle_min < 0 && channel_throttle->servo_out < 0) {
+        control_sensors_enabled |= MAV_SYS_STATUS_REVERSE_MOTOR;
+        control_sensors_health |= MAV_SYS_STATUS_REVERSE_MOTOR;
+    }
 
     if (AP_Notify::flags.initialising) {
         // while initialising the gyros and accels are not enabled
@@ -422,7 +437,7 @@ void Plane::send_vfr_hud(mavlink_channel_t chan)
         aspeed,
         gps.ground_speed(),
         (ahrs.yaw_sensor / 100) % 360,
-        throttle_percentage(),
+        abs(throttle_percentage()),
         current_loc.alt / 100.0f,
         barometer.get_climb_rate());
 }
@@ -495,54 +510,67 @@ void NOINLINE Plane::send_rpm(mavlink_channel_t chan)
 void Plane::send_pid_tuning(mavlink_channel_t chan)
 {
     const Vector3f &gyro = ahrs.get_gyro();
+    const DataFlash_Class::PID_Info *pid_info;
     if (g.gcs_pid_mask & 1) {
-        const DataFlash_Class::PID_Info &pid_info = rollController.get_pid_info();
+        if (quadplane.in_vtol_mode()) {
+            pid_info = &quadplane.pid_rate_roll.get_pid_info();
+        } else {
+            pid_info = &rollController.get_pid_info();
+        }
         mavlink_msg_pid_tuning_send(chan, PID_TUNING_ROLL, 
-                                    pid_info.desired,
+                                    pid_info->desired,
                                     degrees(gyro.x),
-                                    pid_info.FF,
-                                    pid_info.P,
-                                    pid_info.I,
-                                    pid_info.D);
+                                    pid_info->FF,
+                                    pid_info->P,
+                                    pid_info->I,
+                                    pid_info->D);
         if (!HAVE_PAYLOAD_SPACE(chan, PID_TUNING)) {
             return;
         }
     }
     if (g.gcs_pid_mask & 2) {
-        const DataFlash_Class::PID_Info &pid_info = pitchController.get_pid_info();
+        if (quadplane.in_vtol_mode()) {
+            pid_info = &quadplane.pid_rate_pitch.get_pid_info();
+        } else {
+            pid_info = &pitchController.get_pid_info();
+        }
         mavlink_msg_pid_tuning_send(chan, PID_TUNING_PITCH, 
-                                    pid_info.desired,
+                                    pid_info->desired,
                                     degrees(gyro.y),
-                                    pid_info.FF,
-                                    pid_info.P,
-                                    pid_info.I,
-                                    pid_info.D);
+                                    pid_info->FF,
+                                    pid_info->P,
+                                    pid_info->I,
+                                    pid_info->D);
         if (!HAVE_PAYLOAD_SPACE(chan, PID_TUNING)) {
             return;
         }
     }
     if (g.gcs_pid_mask & 4) {
-        const DataFlash_Class::PID_Info &pid_info = yawController.get_pid_info();
+        if (quadplane.in_vtol_mode()) {
+            pid_info = &quadplane.pid_rate_yaw.get_pid_info();
+        } else {
+            pid_info = &yawController.get_pid_info();
+        }
         mavlink_msg_pid_tuning_send(chan, PID_TUNING_YAW,
-                                    pid_info.desired,
+                                    pid_info->desired,
                                     degrees(gyro.z),
-                                    pid_info.FF,
-                                    pid_info.P,
-                                    pid_info.I,
-                                    pid_info.D);
+                                    pid_info->FF,
+                                    pid_info->P,
+                                    pid_info->I,
+                                    pid_info->D);
         if (!HAVE_PAYLOAD_SPACE(chan, PID_TUNING)) {
             return;
         }
     }
     if (g.gcs_pid_mask & 8) {
-        const DataFlash_Class::PID_Info &pid_info = steerController.get_pid_info();
+        pid_info = &steerController.get_pid_info();
         mavlink_msg_pid_tuning_send(chan, PID_TUNING_STEER, 
-                                    pid_info.desired,
+                                    pid_info->desired,
                                     degrees(gyro.z),
-                                    pid_info.FF,
-                                    pid_info.P,
-                                    pid_info.I,
-                                    pid_info.D);
+                                    pid_info->FF,
+                                    pid_info->P,
+                                    pid_info->I,
+                                    pid_info->D);
         if (!HAVE_PAYLOAD_SPACE(chan, PID_TUNING)) {
             return;
         }
@@ -566,15 +594,6 @@ void Plane::send_rangefinder(mavlink_channel_t chan)
 void Plane::send_current_waypoint(mavlink_channel_t chan)
 {
     mavlink_msg_mission_current_send(chan, mission.get_current_nav_index());
-}
-
-void Plane::send_statustext(mavlink_channel_t chan)
-{
-    mavlink_statustext_t *s = &gcs[chan-MAVLINK_COMM_0].pending_status;
-    mavlink_msg_statustext_send(
-        chan,
-        s->severity,
-        s->text);
 }
 
 // are we still delaying telemetry to try to avoid Xbee bricking?
@@ -715,9 +734,8 @@ bool GCS_MAVLINK::try_send_message(enum ap_message id)
         break;
 
     case MSG_STATUSTEXT:
-        CHECK_PAYLOAD_SIZE(STATUSTEXT);
-        plane.send_statustext(chan);
-        break;
+        // depreciated, use GCS_MAVLINK::send_statustext*
+        return false;
 
 #if GEOFENCE_ENABLED == ENABLED
     case MSG_FENCE_STATUS:
@@ -1196,13 +1214,14 @@ void GCS_MAVLINK::handleMessage(mavlink_message_t* msg)
             break;
 
         case MAV_CMD_DO_DIGICAM_CONTROL:
-            plane.camera.control(packet.param1,
-                                 packet.param2,
-                                 packet.param3,
-                                 packet.param4,
-                                 packet.param5,
-                                 packet.param6);
-
+            if (plane.camera.control(packet.param1,
+                                     packet.param2,
+                                     packet.param3,
+                                     packet.param4,
+                                     packet.param5,
+                                     packet.param6)) {
+                plane.log_picture();
+            }
             result = MAV_RESULT_ACCEPTED;
             break;
 #endif // CAMERA == ENABLED
@@ -1383,7 +1402,9 @@ void GCS_MAVLINK::handleMessage(mavlink_message_t* msg)
 
             //Not allowing go around at FLIGHT_LAND_FINAL stage on purpose --
             //if plane is close to the ground a go around coudld be dangerous.
-            if (plane.flight_stage == AP_SpdHgtControl::FLIGHT_LAND_APPROACH) {
+            if (plane.flight_stage == AP_SpdHgtControl::FLIGHT_LAND_APPROACH ||
+                plane.flight_stage == AP_SpdHgtControl::FLIGHT_LAND_PREFLARE ||
+                plane.flight_stage == AP_SpdHgtControl::FLIGHT_LAND_FINAL) {
                 // Initiate an aborted landing. This will trigger a pitch-up and
                 // climb-out to a safe altitude holding heading then one of the
                 // following actions will occur, check for in this order:
@@ -1517,6 +1538,10 @@ void GCS_MAVLINK::handleMessage(mavlink_message_t* msg)
             break;
 #endif
 
+        case MAV_CMD_DO_VTOL_TRANSITION:
+            result = plane.quadplane.handle_do_vtol_transition(packet);
+            break;
+            
         default:
             break;
         }
@@ -2010,14 +2035,7 @@ void Plane::gcs_update(void)
 
 void Plane::gcs_send_text(MAV_SEVERITY severity, const char *str)
 {
-    for (uint8_t i=0; i<num_gcs; i++) {
-        if (gcs[i].initialised) {
-            gcs[i].send_text(severity, str);
-        }
-    }
-#if LOGGING_ENABLED == ENABLED
-    DataFlash.Log_Write_Message(str);
-#endif
+    GCS_MAVLINK::send_statustext(severity, 0xFF, str);
 }
 
 /*
@@ -2027,22 +2045,12 @@ void Plane::gcs_send_text(MAV_SEVERITY severity, const char *str)
  */
 void Plane::gcs_send_text_fmt(MAV_SEVERITY severity, const char *fmt, ...)
 {
+    char str[MAVLINK_MSG_STATUSTEXT_FIELD_TEXT_LEN] {};
     va_list arg_list;
-    gcs[0].pending_status.severity = (uint8_t)severity;
     va_start(arg_list, fmt);
-    hal.util->vsnprintf((char *)gcs[0].pending_status.text,
-            sizeof(gcs[0].pending_status.text), fmt, arg_list);
+    hal.util->vsnprintf((char *)str, sizeof(str), fmt, arg_list);
     va_end(arg_list);
-#if LOGGING_ENABLED == ENABLED
-    DataFlash.Log_Write_Message(gcs[0].pending_status.text);
-#endif
-    gcs[0].send_message(MSG_STATUSTEXT);
-    for (uint8_t i=1; i<num_gcs; i++) {
-        if (gcs[i].initialised) {
-            gcs[i].pending_status = gcs[0].pending_status;
-            gcs[i].send_message(MSG_STATUSTEXT);
-        }
-    }
+    GCS_MAVLINK::send_statustext(severity, 0xFF, str);
 }
 
 /*
@@ -2066,4 +2074,5 @@ void Plane::gcs_send_airspeed_calibration(const Vector3f &vg)
 void Plane::gcs_retry_deferred(void)
 {
     gcs_send_message(MSG_RETRY_DEFERRED);
+    GCS_MAVLINK::service_statustext();
 }

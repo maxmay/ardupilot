@@ -68,6 +68,7 @@ const AP_Scheduler::Task Rover::scheduler_tasks[] = {
     SCHED_TASK(update_events,          50,   1000),
     SCHED_TASK(check_usb_mux,           3,   1000),
     SCHED_TASK(mount_update,           50,    600),
+    SCHED_TASK(update_trigger,         50,    600),
     SCHED_TASK(gcs_failsafe_check,     10,    600),
     SCHED_TASK(compass_accumulate,     50,    900),
     SCHED_TASK(update_notify,          50,    300),
@@ -178,8 +179,21 @@ void Rover::mount_update(void)
 #if MOUNT == ENABLED
     camera_mount.update();
 #endif
+}
+
+/*
+  update camera trigger - 50Hz
+ */
+void Rover::update_trigger(void)
+{
 #if CAMERA == ENABLED
     camera.trigger_pic_cleanup();
+    if (camera.check_trigger_pin()) {
+        gcs_send_message(MSG_CAMERA_FEEDBACK);
+        if (should_log(MASK_LOG_CAMERA)) {
+            DataFlash.Log_Write_Camera(ahrs, gps, current_loc);
+        }
+    } 
 #endif
 }
 
@@ -403,6 +417,9 @@ void Rover::update_current_mode(void)
         set_reverse(false);
         if (rtl_complete || verify_RTL()) {
             // we have reached destination so stop where we are
+            if (channel_throttle->servo_out != g.throttle_min.get()) {
+                gcs_send_mission_item_reached_message(0);
+            }
             channel_throttle->servo_out = g.throttle_min.get();
             channel_steer->servo_out = 0;
             lateral_acceleration = 0;
@@ -507,5 +524,5 @@ void Rover::update_navigation()
         break;
     }
 }
-
+ 
 AP_HAL_MAIN_CALLBACKS(&rover);

@@ -9,22 +9,33 @@ DEFINES         =   -DF_CPU=$(F_CPU)
 DEFINES        +=   -DSKETCH=\"$(SKETCH)\" -DSKETCHNAME="\"$(SKETCH)\"" -DSKETCHBOOK="\"$(SKETCHBOOK)\"" -DAPM_BUILD_DIRECTORY=APM_BUILD_$(SKETCH)
 DEFINES        +=   $(EXTRAFLAGS)
 DEFINES        +=   -DCONFIG_HAL_BOARD=$(HAL_BOARD) -DCONFIG_HAL_BOARD_SUBTYPE=$(HAL_BOARD_SUBTYPE)
-WARNFLAGS       =   -Wformat -Wall -Wshadow -Wpointer-arith -Wcast-align -Wno-unused-parameter -Wno-missing-field-initializers
-WARNFLAGS      +=   -Wwrite-strings -Wformat=2
-WARNFLAGSCXX    = -Wno-reorder \
-	-Werror=format-security \
-	-Werror=array-bounds \
-	-Wfatal-errors \
-	-Werror=unused-but-set-variable \
-	-Werror=uninitialized \
-	-Werror=init-self \
-	-Wno-missing-field-initializers
+WARNFLAGS       =   -Wall -Wextra -Wformat -Wshadow -Wpointer-arith -Wcast-align \
+                    -Wlogical-op -Wwrite-strings -Wformat=2 -Wno-unused-parameter
+WARNFLAGSCXX    = \
+        -Wno-missing-field-initializers \
+        -Wno-reorder \
+        -Werror=format-security \
+        -Werror=array-bounds \
+        -Werror=unused-but-set-variable \
+        -Werror=uninitialized \
+        -Werror=init-self \
+        -Wfatal-errors \
+        -Wundef
+
 DEPFLAGS        =   -MD -MP -MT $@
 
 CXXOPTS         =   -ffunction-sections -fdata-sections -fno-exceptions -fsigned-char
 COPTS           =   -ffunction-sections -fdata-sections -fsigned-char
 
 ASOPTS          =   -x assembler-with-cpp 
+
+# features: TODO detect dependecy and make them optional
+HAVE_LTTNG=
+
+ifeq ($(HAVE_LTTNG),1)
+DEFINES        += -DPERF_LTTNG=1
+LIBS           += -llttng-ust -ldl
+endif
 
 # disable as this breaks distcc
 #ifneq ($(SYSTYPE),Darwin)
@@ -47,7 +58,7 @@ ifneq ($(SYSTYPE),Darwin)
 LDFLAGS        +=   -Wl,--gc-sections -Wl,-Map -Wl,$(SKETCHMAP)
 endif
 
-LIBS ?= -lm -lpthread
+LIBS ?= -lm -pthread
 ifneq ($(findstring CYGWIN, $(SYSTYPE)),)
 LIBS += -lwinmm
 endif

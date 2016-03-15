@@ -14,25 +14,13 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-
-#ifndef __AP_NOTIFY_H__
-#define __AP_NOTIFY_H__
+#pragma once
 
 #include <AP_Common/AP_Common.h>
-#include <GCS_MAVLink/GCS_MAVLink.h>
 #include <AP_Param/AP_Param.h>
-#include "AP_BoardLED.h"
-#include "ToshibaLED.h"
-#include "ToshibaLED_I2C.h"
-#include "ToshibaLED_PX4.h"
-#include "ToneAlarm_PX4.h"
-#include "ToneAlarm_Linux.h"
-#include "NavioLED_I2C.h"
-#include "ExternalLED.h"
-#include "Buzzer.h"
-#include "VRBoard_LED.h"
-#include "OreoLED_PX4.h"
-#include "RCOutputRGBLed.h"
+#include <GCS_MAVLink/GCS_MAVLink.h>
+
+#include "NotifyDevice.h"
 
 #ifndef OREOLED_ENABLED
  # define OREOLED_ENABLED   0   // set to 1 to enable OreoLEDs
@@ -55,6 +43,7 @@ public:
     struct notify_flags_type {
         uint32_t initialising       : 1;    // 1 if initialising and copter should not be moved
         uint32_t gps_status         : 3;    // 0 = no gps, 1 = no lock, 2 = 2d lock, 3 = 3d lock, 4 = dgps lock, 5 = rtk lock
+        uint32_t gps_num_sats       : 6;    // number of sats
         uint32_t armed              : 1;    // 0 = disarmed, 1 = armed
         uint32_t pre_arm_check      : 1;    // 0 = failing checks, 1 = passed
         uint32_t pre_arm_gps_check  : 1;    // 0 = failing pre-arm GPS checks, 1 = passed
@@ -71,6 +60,7 @@ public:
         // additional flags
         uint32_t external_leds      : 1;    // 1 if external LEDs are enabled (normally only used for copter)
         uint32_t vehicle_lost       : 1;    // 1 when lost copter tone is requested (normally only used for copter)
+        uint32_t waiting_for_throw  : 1;    // 1 when copter is in THROW mode and waiting to detect the user hand launch
     };
 
     /// notify_events_type - bitmask of active events.
@@ -112,5 +102,3 @@ private:
 
     AP_Int8 _rgb_led_brightness;
 };
-
-#endif    // __AP_NOTIFY_H__

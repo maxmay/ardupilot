@@ -380,6 +380,7 @@ private:
     // private member functions
     void ahrs_update();
     void mount_update(void);
+    void update_trigger(void);    
     void update_alt();
     void gcs_failsafe_check(void);
     void compass_accumulate(void);
@@ -406,7 +407,6 @@ private:
     void send_pid_tuning(mavlink_channel_t chan);
     void send_rangefinder(mavlink_channel_t chan);
     void send_current_waypoint(mavlink_channel_t chan);
-    void send_statustext(mavlink_channel_t chan);
     bool telemetry_delayed(mavlink_channel_t chan);
     void gcs_send_message(enum ap_message id);
     void gcs_send_mission_item_reached_message(uint16_t mission_index);

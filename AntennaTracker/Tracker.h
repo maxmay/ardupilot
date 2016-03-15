@@ -1,7 +1,7 @@
 /// -*- tab-width: 4; Mode: C++; c-basic-offset: 4; indent-tabs-mode: nil -*-
 
-#define THISFIRMWARE "AntennaTracker V0.7.5"
-#define FIRMWARE_VERSION 0,7,5,FIRMWARE_VERSION_TYPE_DEV
+#define THISFIRMWARE "AntennaTracker V0.7.6"
+#define FIRMWARE_VERSION 0,7,6,FIRMWARE_VERSION_TYPE_DEV
 
 /*
    Lead developers: Matthew Ridley and Andrew Tridgell
@@ -202,7 +202,6 @@ private:
     void send_radio_out(mavlink_channel_t chan);
     void send_hwstatus(mavlink_channel_t chan);
     void send_waypoint_request(mavlink_channel_t chan);
-    void send_statustext(mavlink_channel_t chan);
     void send_nav_controller_output(mavlink_channel_t chan);
     void send_simstate(mavlink_channel_t chan);
     void mavlink_check_target(const mavlink_message_t* msg);

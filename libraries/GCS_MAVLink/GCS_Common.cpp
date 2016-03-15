@@ -27,10 +27,9 @@ extern const AP_HAL::HAL& hal;
 
 uint32_t GCS_MAVLINK::last_radio_status_remrssi_ms;
 uint8_t GCS_MAVLINK::mavlink_active = 0;
-uint16_t GCS_MAVLINK::_parameter_count;
+ObjectArray<GCS_MAVLINK::statustext_t> GCS_MAVLINK::_statustext_queue(GCS_MAVLINK_PAYLOAD_STATUS_CAPACITY);
 
-GCS_MAVLINK::GCS_MAVLINK() :
-    waypoint_receive_timeout(5000)
+GCS_MAVLINK::GCS_MAVLINK()
 {
     AP_Param::setup_object_defaults(this, var_info);
 }
@@ -101,22 +100,6 @@ GCS_MAVLINK::setup_uart(const AP_SerialManager& serial_manager, AP_SerialManager
 
     // and init the gcs instance
     init(uart, mav_chan);
-}
-
-uint16_t
-GCS_MAVLINK::_count_parameters()
-{
-    // if we haven't cached the parameter count yet...
-    if (0 == _parameter_count) {
-        AP_Param  *vp;
-        AP_Param::ParamToken token;
-
-        vp = AP_Param::first(&token, NULL);
-        do {
-            _parameter_count++;
-        } while (NULL != (vp = AP_Param::next_scalar(&token, NULL)));
-    }
-    return _parameter_count;
 }
 
 /**
@@ -210,12 +193,10 @@ void GCS_MAVLINK::send_meminfo(void)
 // report power supply status
 void GCS_MAVLINK::send_power_status(void)
 {
-#if defined(CONFIG_ARCH_BOARD_PX4FMU_V2) || defined(CONFIG_ARCH_BOARD_PX4FMU_V4)
     mavlink_msg_power_status_send(chan,
                                   hal.analogin->board_voltage() * 1000,
                                   hal.analogin->servorail_voltage() * 1000,
                                   hal.analogin->power_status_flags());
-#endif
 }
 
 // report AHRS2 state
@@ -378,7 +359,7 @@ void GCS_MAVLINK::handle_mission_clear_all(AP_Mission &mission, mavlink_message_
         mavlink_msg_mission_ack_send(chan, msg->sysid, msg->compid, MAV_RESULT_ACCEPTED);
     }else{
         // send nack
-        mavlink_msg_mission_ack_send(chan, msg->sysid, msg->compid, 1);
+        mavlink_msg_mission_ack_send(chan, msg->sysid, msg->compid, MAV_MISSION_ERROR);
     }
 }
 
@@ -514,13 +495,13 @@ void GCS_MAVLINK::handle_param_request_list(mavlink_message_t *msg)
     // send system ID if we can
     char sysid[40];
     if (hal.util->get_system_id(sysid)) {
-        send_text(MAV_SEVERITY_WARNING, sysid);
+        send_text(MAV_SEVERITY_INFO, sysid);
     }
 
     // Start sending parameters - next call to ::update will kick the first one out
     _queued_parameter = AP_Param::first(&_queued_parameter_token, &_queued_parameter_type);
     _queued_parameter_index = 0;
-    _queued_parameter_count = _count_parameters();
+    _queued_parameter_count = AP_Param::count_parameters();
 }
 
 void GCS_MAVLINK::handle_param_request_read(mavlink_message_t *msg)
@@ -555,7 +536,7 @@ void GCS_MAVLINK::handle_param_request_read(mavlink_message_t *msg)
         param_name,
         value,
         mav_var_type(p_type),
-        _count_parameters(),
+        AP_Param::count_parameters(),
         packet.param_index);
 }
 
@@ -602,18 +583,7 @@ void GCS_MAVLINK::handle_param_set(mavlink_message_t *msg, DataFlash_Class *Data
 void
 GCS_MAVLINK::send_text(MAV_SEVERITY severity, const char *str)
 {
-    if (severity < MAV_SEVERITY_WARNING && 
-        comm_get_txspace(chan) >= 
-        MAVLINK_NUM_NON_PAYLOAD_BYTES+MAVLINK_MSG_ID_STATUSTEXT_LEN) {
-        // send immediately
-        mavlink_msg_statustext_send(chan, severity, str);
-    } else {
-        // send via the deferred queuing system
-        mavlink_statustext_t *s = &pending_status;
-        s->severity = (uint8_t)severity;
-        strncpy((char *)s->text, str, sizeof(s->text));
-        send_message(MSG_STATUSTEXT);
-    }
+    GCS_MAVLINK::send_statustext_chan(severity, chan, str);
 }
 
 void GCS_MAVLINK::handle_radio_status(mavlink_message_t *msg, DataFlash_Class &dataflash, bool log_radio)
@@ -1153,19 +1123,100 @@ void GCS_MAVLINK::send_ahrs(AP_AHRS &ahrs)
  */
 void GCS_MAVLINK::send_statustext_all(MAV_SEVERITY severity, const char *fmt, ...)
 {
-    for (uint8_t i=0; i<MAVLINK_COMM_NUM_BUFFERS; i++) {
-        if ((1U<<i) & mavlink_active) {
-            mavlink_channel_t chan = (mavlink_channel_t)(MAVLINK_COMM_0+i);
-            if (comm_get_txspace(chan) >= MAVLINK_NUM_NON_PAYLOAD_BYTES + MAVLINK_MSG_ID_STATUSTEXT_LEN) {
-                char msg2[50];
-                va_list arg_list;
-                va_start(arg_list, fmt);
-                hal.util->vsnprintf((char *)msg2, sizeof(msg2), fmt, arg_list);
-                va_end(arg_list);
-                mavlink_msg_statustext_send(chan,
-                                            severity,
-                                            msg2);
+    char text[MAVLINK_MSG_STATUSTEXT_FIELD_TEXT_LEN] {};
+    va_list arg_list;
+    va_start(arg_list, fmt);
+    hal.util->vsnprintf((char *)text, sizeof(text), fmt, arg_list);
+    va_end(arg_list);
+    send_statustext(severity, mavlink_active, text);
+}
+
+/*
+    send a statustext message to specific MAVLink channel, zero indexed
+*/
+void GCS_MAVLINK::send_statustext_chan(MAV_SEVERITY severity, uint8_t dest_chan, const char *fmt, ...)
+{
+    char text[MAVLINK_MSG_STATUSTEXT_FIELD_TEXT_LEN] {};
+    va_list arg_list;
+    va_start(arg_list, fmt);
+    hal.util->vsnprintf((char *)text, sizeof(text), fmt, arg_list);
+    va_end(arg_list);
+    send_statustext(severity, (1<<dest_chan), text);
+}
+
+
+/*
+    send a statustext text string to specific MAVLink bitmask
+*/
+void GCS_MAVLINK::send_statustext(MAV_SEVERITY severity, uint8_t dest_bitmask, const char *text)
+{
+    if (dataflash_p != NULL) {
+        dataflash_p->Log_Write_Message(text);
+    }
+
+    // filter destination ports to only allow active ports.
+    statustext_t statustext{};
+    statustext.bitmask = mavlink_active & dest_bitmask;
+    if (!statustext.bitmask) {
+        // nowhere to send
+        return;
+    }
+
+    statustext.msg.severity = severity;
+    strncpy(statustext.msg.text, text, sizeof(statustext.msg.text));
+
+    // The force push will ensure comm links do not block other comm links forever if they fail.
+    // If we push to a full buffer then we overwrite the oldest entry, effectively removing the
+    // block but not until the buffer fills up.
+    _statustext_queue.push_force(statustext);
+
+    // try and send immediately if possible
+    service_statustext();
+}
+/*
+    send a statustext message to specific MAVLink connections in a bitmask
+ */
+void GCS_MAVLINK::service_statustext(void)
+{
+    // create bitmask of what mavlink ports we should send this text to.
+    // note, if sending to all ports, we only need to store the bitmask for each and the string only once.
+    // once we send over a link, clear the port but other busy ports bit may stay allowing for faster links
+    // to clear the bit and send quickly but slower links to still store the string. Regardless of mixed
+    // bitrates of ports, a maximum of GCS_MAVLINK_PAYLOAD_STATUS_CAPACITY strings can be buffered. Downside
+    // is if you have a super slow link mixed with a faster port, if there are GCS_MAVLINK_PAYLOAD_STATUS_CAPACITY
+    // strings in the slow queue then the next item can not be queued for the faster link
+
+    if (_statustext_queue.empty()) {
+        // nothing to do
+        return;
+    }
+
+    for (uint8_t idx=0; idx<GCS_MAVLINK_PAYLOAD_STATUS_CAPACITY; ) {
+        statustext_t *statustext = _statustext_queue[idx];
+        if (statustext == nullptr) {
+            break;
+        }
+
+        // try and send to all active mavlink ports listed in the statustext.bitmask
+        for (uint8_t i=0; i<MAVLINK_COMM_NUM_BUFFERS; i++) {
+            uint8_t chan_bit = (1U<<i);
+            // logical AND (&) to mask them together
+            if (statustext->bitmask & chan_bit) {
+                // something is queued on a port and that's the port index we're looped at
+                mavlink_channel_t chan_index = (mavlink_channel_t)(MAVLINK_COMM_0+i);
+                if (comm_get_txspace(chan_index) >= MAVLINK_NUM_NON_PAYLOAD_BYTES + MAVLINK_MSG_ID_STATUSTEXT_LEN) {
+                    // we have space so send then clear that channel bit on the mask
+                    mavlink_msg_statustext_send(chan_index, statustext->msg.severity, statustext->msg.text);
+                    statustext->bitmask &= ~chan_bit;
+                }
             }
+        }
+
+        if (statustext->bitmask == 0) {
+            _statustext_queue.remove(idx);
+        } else {
+            // move to next index
+            idx++;
         }
     }
 }
@@ -1184,7 +1235,7 @@ void GCS_MAVLINK::send_parameter_value_all(const char *param_name, ap_var_type p
                     param_name,
                     param_value,
                     mav_var_type(param_type),
-                    _count_parameters(),
+                    AP_Param::count_parameters(),
                     -1);
             }
         }

@@ -83,12 +83,17 @@ void Plane::update_is_flying_5Hz(void)
                 }
                 break;
 
+            case AP_SpdHgtControl::FLIGHT_VTOL:
+                // TODO: detect ground impacts
+                break;
+
             case AP_SpdHgtControl::FLIGHT_LAND_APPROACH:
                 if (fabsf(auto_state.sink_rate) > 0.2f) {
                     is_flying_bool = true;
                 }
                 break;
 
+            case AP_SpdHgtControl::FLIGHT_LAND_PREFLARE:
             case AP_SpdHgtControl::FLIGHT_LAND_FINAL:
                 break;
 
@@ -121,6 +126,10 @@ void Plane::update_is_flying_5Hz(void)
         isFlyingProbability = (0.85f * isFlyingProbability) + (0.15f * (float)is_flying_bool);
     }
 
+    if (quadplane.is_flying()) {
+        is_flying_bool = true;
+    }
+    
     /*
       update last_flying_ms so we always know how long we have not
       been flying for. This helps for crash detection and auto-disarm
@@ -145,6 +154,8 @@ void Plane::update_is_flying_5Hz(void)
         }
     }
     previous_is_flying = new_is_flying;
+
+    crash_detection_update();
 
     if (should_log(MASK_LOG_MODE)) {
         Log_Write_Status();
@@ -198,6 +209,11 @@ void Plane::crash_detection_update(void)
             // TODO: handle auto missions without NAV_TAKEOFF mission cmd
             break;
 
+        case AP_SpdHgtControl::FLIGHT_VTOL:
+            // we need a totally new method for this
+            crashed = false;
+            break;
+            
         case AP_SpdHgtControl::FLIGHT_LAND_APPROACH:
             crashed = true;
             // when altitude gets low, we automatically progress to FLIGHT_LAND_FINAL
@@ -205,6 +221,7 @@ void Plane::crash_detection_update(void)
             // a crash into a tree would be caught here.
             break;
 
+        case AP_SpdHgtControl::FLIGHT_LAND_PREFLARE:
         case AP_SpdHgtControl::FLIGHT_LAND_FINAL:
             // We should be nice and level-ish in this flight stage. If not, we most
             // likely had a crazy landing. Throttle is inhibited already at the flare

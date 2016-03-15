@@ -66,6 +66,8 @@ void Tracker::init_tracker()
     log_init();
 #endif
 
+    GCS_MAVLINK::set_dataflash(&DataFlash);
+
     if (g.compass_enabled==true) {
         if (!compass.init() || !compass.read()) {
             hal.console->println("Compass initialisation failed!");
@@ -213,6 +215,9 @@ void Tracker::set_mode(enum ControlMode mode)
         disarm_servos();
         break;
     }
+
+	// log mode change
+	DataFlash.Log_Write_Mode(control_mode);
 }
 
 /*

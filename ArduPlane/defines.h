@@ -63,7 +63,10 @@ enum FlightMode {
     RTL           = 11,
     LOITER        = 12,
     GUIDED        = 15,
-    INITIALISING  = 16
+    INITIALISING  = 16,
+    QSTABILIZE    = 17,
+    QHOVER        = 18,
+    QLOITER       = 19
 };
 
 // type of stick mixing enabled
@@ -113,10 +116,8 @@ enum log_messages {
     LOG_RC_MSG,
     LOG_SONAR_MSG,
     LOG_ARM_DISARM_MSG,
-    LOG_STATUS_MSG 
-#if OPTFLOW == ENABLED
-    ,LOG_OPTFLOW_MSG
-#endif
+    LOG_STATUS_MSG,
+    LOG_OPTFLOW_MSG
 };
 
 #define MASK_LOG_ATTITUDE_FAST          (1<<0)
@@ -190,4 +191,20 @@ enum {
     CRASH_DETECT_ACTION_BITMASK_DISARM = (1<<0),
     // note: next enum will be (1<<1), then (1<<2), then (1<<3)
 };
+
+enum {
+    USE_REVERSE_THRUST_NEVER                    = 0,
+    USE_REVERSE_THRUST_AUTO_ALWAYS              = (1<<0),
+    USE_REVERSE_THRUST_AUTO_LAND_APPROACH       = (1<<1),
+    USE_REVERSE_THRUST_AUTO_LOITER_TO_ALT       = (1<<2),
+    USE_REVERSE_THRUST_AUTO_LOITER_ALL          = (1<<3),
+    USE_REVERSE_THRUST_AUTO_WAYPOINT            = (1<<4),
+    USE_REVERSE_THRUST_LOITER                   = (1<<5),
+    USE_REVERSE_THRUST_RTL                      = (1<<6),
+    USE_REVERSE_THRUST_CIRCLE                   = (1<<7),
+    USE_REVERSE_THRUST_CRUISE                   = (1<<8),
+    USE_REVERSE_THRUST_FBWB                     = (1<<9),
+    USE_REVERSE_THRUST_GUIDED                   = (1<<10),
+};
+
 #endif // _DEFINES_H

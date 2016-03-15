@@ -118,6 +118,12 @@ extern const AP_HAL::HAL& hal;
 
 // Define tuning parameters
 const AP_Param::GroupInfo NavEKF::var_info[] = {
+    // @Param: ENABLE
+    // @DisplayName: Enable EKF1
+    // @Description: This enables EKF1 to be disabled when using alternative algorithms. When disabling it, the alternate EKF2 estimator must be enabled by setting EK2_ENABLED = 1 and flight control algorithms must be set to use the alternative estimator by setting AHRS_EKF_TYPE = 2.
+    // @Values: 0:Disabled, 1:Enabled
+    // @User: Advanced
+    AP_GROUPINFO_FLAGS("ENABLE", 34, NavEKF, _enable, 0, AP_PARAM_FLAG_ENABLE),
 
     // @Param: VELNE_NOISE
     // @DisplayName: GPS horizontal velocity measurement noise scaler
@@ -396,13 +402,6 @@ const AP_Param::GroupInfo NavEKF::var_info[] = {
     // @User: Advanced
     AP_GROUPINFO("GPS_CHECK",    33, NavEKF, _gpsCheck, 31),
 
-    // @Param: ENABLE
-    // @DisplayName: Enable EKF1
-    // @Description: This enables EKF1 to be disabled when using alternative algorithms. When disabling it, the alternate EKF2 estimator must be enabled by setting EK2_ENABLED = 1 and flight control algorithms must be set to use the alternative estimator by setting AHRS_EKF_TYPE = 2.
-    // @Values: 0:Disabled, 1:Enabled
-    // @User: Advanced
-    AP_GROUPINFO("ENABLE", 34, NavEKF, _enable, 1),
-
     AP_GROUPEND
 };
 
@@ -422,6 +421,11 @@ bool NavEKF::InitialiseFilterDynamic(void)
         return false;
     }
     if (core == nullptr) {
+        if (hal.util->available_memory() < 4096 + sizeof(*core)) {
+            _enable.set(0);
+            GCS_MAVLINK::send_statustext_all(MAV_SEVERITY_CRITICAL, "NavEKF: not enough memory");
+            return false;
+        }
         core = new NavEKF_core(*this, _ahrs, _baro, _rng);
         if (core == nullptr) {
             _enable.set(0);

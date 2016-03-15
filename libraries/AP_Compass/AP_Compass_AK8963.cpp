@@ -160,7 +160,8 @@ bool AP_Compass_AK8963::init()
     /* register the compass instance in the frontend */
     _compass_instance = register_compass();
     set_dev_id(_compass_instance, _bus->get_dev_id());
-    hal.scheduler->register_timer_process(FUNCTOR_BIND_MEMBER(&AP_Compass_AK8963::_update, void));
+    /* timer needs to be called every 10ms so set the freq_div to 10 */
+    _timesliced = hal.scheduler->register_timer_process(FUNCTOR_BIND_MEMBER(&AP_Compass_AK8963::_update, void), 10);
 
     _bus_sem->give();
     hal.scheduler->resume_timer_procs();
@@ -230,12 +231,12 @@ void AP_Compass_AK8963::_update()
     Vector3f raw_field;
     uint32_t time_us = AP_HAL::micros();
 
-
-    if (AP_HAL::micros() - _last_update_timestamp < 10000) {
+    if (!_timesliced &&
+        AP_HAL::micros() - _last_update_timestamp < 10000) {
         goto end;
     }
 
-    if (!_sem_take_nonblocking()) {
+    if (!_bus_sem->take_nonblocking()) {
         goto end;
     }
 
@@ -286,7 +287,7 @@ void AP_Compass_AK8963::_update()
 
     _last_update_timestamp = AP_HAL::micros();
 fail:
-    _sem_give();
+    _bus_sem->give();
 end:
     return;
 }
@@ -334,37 +335,6 @@ bool AP_Compass_AK8963::_calibrate()
     return true;
 }
 
-bool AP_Compass_AK8963::_sem_take_blocking()
-{
-    return _bus_sem->take(10);
-}
-
-bool AP_Compass_AK8963::_sem_give()
-{
-    return _bus_sem->give();
-}
-
-bool AP_Compass_AK8963::_sem_take_nonblocking()
-{
-    static int _sem_failure_count = 0;
-
-    if (_bus_sem->take_nonblocking()) {
-        _sem_failure_count = 0;
-        return true;
-    }
-
-    if (!hal.scheduler->system_initializing() ) {
-        _sem_failure_count++;
-        if (_sem_failure_count > 100) {
-            AP_HAL::panic("PANIC: failed to take _bus->sem "
-                                 "100 times in a row, in "
-                                 "AP_Compass_AK8963");
-        }
-    }
-
-    return false;
-}
-
 void AP_Compass_AK8963::_dump_registers()
 {
 #if AK8963_DEBUG
@@ -391,7 +361,7 @@ AP_AK8963_SerialBus_MPU9250::AP_AK8963_SerialBus_MPU9250(AP_InertialSensor &ins,
 {
     // Only initialize members. Fails are handled by configure or while
     // getting the semaphore
-    _bus = ins.get_auxiliary_bus(HAL_INS_MPU9250, mpu9250_instance);
+    _bus = ins.get_auxiliary_bus(HAL_INS_MPU9250_SPI, mpu9250_instance);
     if (!_bus)
         AP_HAL::panic("Cannot get MPU9250 auxiliary bus");
 

@@ -154,7 +154,7 @@ void AP_Mount_Servo::stabilize()
         // lead filter
         const Vector3f &gyro = _frontend._ahrs.get_gyro();
 
-        if (_state._stab_roll && !is_zero(_state._roll_stb_lead) && fabsf(_frontend._ahrs.pitch) < M_PI_F/3.0f) {
+        if (_state._stab_roll && !is_zero(_state._roll_stb_lead) && fabsf(_frontend._ahrs.pitch) < M_PI/3.0f) {
             // Compute rate of change of euler roll angle
             float roll_rate = gyro.x + (_frontend._ahrs.sin_pitch() / _frontend._ahrs.cos_pitch()) * (gyro.y * _frontend._ahrs.sin_roll() + gyro.z * _frontend._ahrs.cos_roll());
             _angle_bf_output_deg.x -= degrees(roll_rate) * _state._roll_stb_lead;
@@ -180,8 +180,6 @@ int16_t AP_Mount_Servo::closest_limit(int16_t angle, int16_t angle_min, int16_t 
     while (angle_min >= 1800) angle_min -= 3600;
     while (angle_max < -1800) angle_max += 3600;
     while (angle_max >= 1800) angle_max -= 3600;
-    // TODO call this function somehow, otherwise this will never work
-    //set_range(min, max);
 
     // If the angle is outside servo limits, saturate the angle to the closest limit
     // On a circle the closest angular position must be carefully calculated to account for wrap-around

@@ -114,6 +114,8 @@ void Plane::init_ardupilot()
     // initialise serial ports
     serial_manager.init();
 
+    GCS_MAVLINK::set_dataflash(&DataFlash);
+
     // allow servo set on all channels except first 4
     ServoRelayEvents.set_channel_mask(0xFFF0);
 
@@ -196,13 +198,12 @@ void Plane::init_ardupilot()
     gps.init(&DataFlash, serial_manager);
 
     init_rc_in();               // sets up rc channels from radio
-    init_rc_out();              // sets up the timer libs
 
     relay.init();
 
 #if MOUNT == ENABLED
     // initialise camera mount
-    camera_mount.init(serial_manager);
+    camera_mount.init(&DataFlash, serial_manager);
 #endif
 
 #if FENCE_TRIGGERED_PIN > 0
@@ -233,6 +234,12 @@ void Plane::init_ardupilot()
 
     startup_ground();
 
+    quadplane.setup();
+
+    // don't initialise rc output until after quadplane is setup as
+    // that can change initial values of channels
+    init_rc_out();
+    
     // choose the nav controller
     set_nav_controller();
 
@@ -304,7 +311,7 @@ void Plane::startup_ground(void)
     serial_manager.set_blocking_writes_all(false);
 
     ins.set_raw_logging(should_log(MASK_LOG_IMU_RAW));
-    ins.set_dataflash(&DataFlash);    
+    ins.set_dataflash(&DataFlash);
 
     gcs_send_text(MAV_SEVERITY_INFO,"Ready to fly");
 }
@@ -337,6 +344,9 @@ void Plane::set_mode(enum FlightMode mode)
     // reset go around command
     auto_state.commanded_go_around = false;
 
+    // not in pre-flare
+    auto_state.land_pre_flare = false;
+    
     // zero locked course
     steer_state.locked_course_err = 0;
 
@@ -373,6 +383,9 @@ void Plane::set_mode(enum FlightMode mode)
     // new mode means new loiter
     loiter.start_time_ms = 0;
 
+    // assume non-VTOL mode
+    auto_state.vtol_mode = false;
+    
     switch(control_mode)
     {
     case INITIALISING:
@@ -396,7 +409,7 @@ void Plane::set_mode(enum FlightMode mode)
         acro_state.locked_roll = false;
         acro_state.locked_pitch = false;
         break;
-
+        
     case CRUISE:
         auto_throttle_mode = true;
         cruise_state.locked_heading = false;
@@ -417,6 +430,7 @@ void Plane::set_mode(enum FlightMode mode)
 
     case AUTO:
         auto_throttle_mode = true;
+        auto_state.vtol_mode = false;
         next_WP_loc = prev_WP_loc = current_loc;
         // start or resume the mission, based on MIS_AUTORESET
         mission.start_or_resume();
@@ -442,6 +456,17 @@ void Plane::set_mode(enum FlightMode mode)
         */
         guided_WP_loc = current_loc;
         set_guided_WP();
+        break;
+
+    case QSTABILIZE:
+    case QHOVER:
+    case QLOITER:
+        if (!quadplane.init_mode()) {
+            control_mode = previous_mode;
+        } else {
+            auto_throttle_mode = false;
+            auto_state.vtol_mode = true;
+        }
         break;
     }
 
@@ -477,6 +502,9 @@ bool Plane::mavlink_set_mode(uint8_t mode)
     case AUTO:
     case RTL:
     case LOITER:
+    case QSTABILIZE:
+    case QHOVER:
+    case QLOITER:
         set_mode((enum FlightMode)mode);
         return true;
     }
@@ -505,7 +533,9 @@ void Plane::check_long_failsafe()
     uint32_t tnow = millis();
     // only act on changes
     // -------------------
-    if(failsafe.state != FAILSAFE_LONG && failsafe.state != FAILSAFE_GCS && flight_stage != AP_SpdHgtControl::FLIGHT_LAND_FINAL &&
+    if(failsafe.state != FAILSAFE_LONG && failsafe.state != FAILSAFE_GCS &&
+            flight_stage != AP_SpdHgtControl::FLIGHT_LAND_FINAL &&
+            flight_stage != AP_SpdHgtControl::FLIGHT_LAND_PREFLARE &&
             flight_stage != AP_SpdHgtControl::FLIGHT_LAND_APPROACH) {
         if (failsafe.state == FAILSAFE_SHORT &&
                    (tnow - failsafe.ch3_timer_ms) > g.long_fs_timeout*1000) {
@@ -539,8 +569,10 @@ void Plane::check_short_failsafe()
 {
     // only act on changes
     // -------------------
-    if(failsafe.state == FAILSAFE_NONE && (flight_stage != AP_SpdHgtControl::FLIGHT_LAND_FINAL &&
-            flight_stage != AP_SpdHgtControl::FLIGHT_LAND_APPROACH)) {
+    if(failsafe.state == FAILSAFE_NONE &&
+            flight_stage != AP_SpdHgtControl::FLIGHT_LAND_FINAL &&
+            flight_stage != AP_SpdHgtControl::FLIGHT_LAND_PREFLARE &&
+            flight_stage != AP_SpdHgtControl::FLIGHT_LAND_APPROACH) {
         if(failsafe.ch3_failsafe) {                                              // The condition is checked and the flag ch3_failsafe is set in radio.pde
             failsafe_short_on_event(FAILSAFE_SHORT);
         }
@@ -726,13 +758,21 @@ void Plane::frsky_telemetry_send(void)
 
 
 /*
-  return throttle percentage from 0 to 100
+  return throttle percentage from 0 to 100 for normal use and -100 to 100 when using reverse thrust
  */
-uint8_t Plane::throttle_percentage(void)
+int8_t Plane::throttle_percentage(void)
 {
+    if (auto_state.vtol_mode) {
+        return quadplane.throttle_percentage();
+    }
     // to get the real throttle we need to use norm_output() which
     // returns a number from -1 to 1.
-    return constrain_int16(50*(channel_throttle->norm_output()+1), 0, 100);
+    if (aparm.throttle_min >= 0) {
+        return constrain_int16(50*(channel_throttle->norm_output()+1), 0, 100);
+    } else {
+        // reverse thrust
+        return constrain_int16(100*channel_throttle->norm_output(), -100, 100);
+    }
 }
 
 /*
@@ -743,6 +783,7 @@ void Plane::change_arm_state(void)
     Log_Arm_Disarm();
     hal.util->set_soft_armed(arming.is_armed() &&
                              hal.util->safety_switch_state() != AP_HAL::Util::SAFETY_DISARMED);
+    quadplane.set_armed(hal.util->get_soft_armed());
 }
 
 /*

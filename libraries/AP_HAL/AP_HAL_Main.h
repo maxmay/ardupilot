@@ -1,10 +1,11 @@
-#ifndef __AP_HAL_MAIN_H__
-#define __AP_HAL_MAIN_H__
+#pragma once
 
 #include "HAL.h"
 
 #if CONFIG_HAL_BOARD == HAL_BOARD_FLYMAPLE
 #define CONFIG_MAIN_WITHOUT_ARGC_ARGV 1
+#else
+#define CONFIG_MAIN_WITHOUT_ARGC_ARGV 0
 #endif
 
 #if CONFIG_HAL_BOARD == HAL_BOARD_PX4 || CONFIG_HAL_BOARD == HAL_BOARD_VRBRAIN
@@ -54,5 +55,3 @@
     }
 
 #endif
-
-#endif // __AP_HAL_MAIN_H__

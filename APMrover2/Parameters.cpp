@@ -193,7 +193,6 @@ const AP_Param::Info Rover::var_info[] = {
     // @Path: ../libraries/RC_Channel/RC_Channel.cpp,../libraries/RC_Channel/RC_Channel_aux.cpp
 	GGROUP(rc_8,                    "RC8_", RC_Channel_aux),
 
-#if CONFIG_HAL_BOARD == HAL_BOARD_PX4 || CONFIG_HAL_BOARD == HAL_BOARD_VRBRAIN
     // @Group: RC9_
     // @Path: ../libraries/RC_Channel/RC_Channel.cpp,../libraries/RC_Channel/RC_Channel_aux.cpp
     GGROUP(rc_9,                    "RC9_", RC_Channel_aux),
@@ -217,7 +216,6 @@ const AP_Param::Info Rover::var_info[] = {
     // @Group: RC14_
     // @Path: ../libraries/RC_Channel/RC_Channel.cpp,../libraries/RC_Channel/RC_Channel_aux.cpp
     GGROUP(rc_14,                    "RC14_", RC_Channel_aux),
-#endif
 
     // @Param: THR_MIN
     // @DisplayName: Minimum Throttle
@@ -584,13 +582,13 @@ void Rover::load_parameters(void)
 		// save the current format version
 		g.format_version.set_and_save(Parameters::k_format_version);
 		cliSerial->println("done.");
-    } else {
-	    unsigned long before = micros();
-	    // Load all auto-loaded EEPROM variables
-	    AP_Param::load_all();
+    }
 
-	    cliSerial->printf("load_all took %luus\n", micros() - before);
-	}
+    unsigned long before = micros();
+    // Load all auto-loaded EEPROM variables
+    AP_Param::load_all();
+    
+    cliSerial->printf("load_all took %luus\n", micros() - before);
 
     // set a more reasonable default NAVL1_PERIOD for rovers
     L1_controller.set_default_period(8);
