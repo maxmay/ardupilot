@@ -66,6 +66,7 @@ public:
     const Vector2f& last_bf_angle_to_target() const { return _angle_to_target; }
     const Vector2f& last_ef_angle_to_target() const { return _ef_angle_to_target; }
     const Vector3f& last_target_pos_offset() const { return _target_pos_offset; }
+    float last_size_rad() const { return _size_rad; }
 
     // parameter var table
     static const struct AP_Param::GroupInfo var_info[];
@@ -97,6 +98,7 @@ private:
     // output from sensor (stored for logging)
     Vector2f                    _angle_to_target;   // last raw sensor angle to target
     Vector2f                    _ef_angle_to_target;// last earth-frame angle to target
+    float                       _size_rad;          // target's apparent size in the frame in radians
 
     // output from controller
     bool                        _have_estimate;     // true if we have a recent estimated position offset
