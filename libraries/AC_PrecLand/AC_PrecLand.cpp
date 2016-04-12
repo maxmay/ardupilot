@@ -158,29 +158,29 @@ void AC_PrecLand::calc_angles_and_pos(float alt_above_terrain_cm)
         return;
     }
 
-    float x_rad;
-    float y_rad;
+    //float x_rad;
+    //float y_rad;
 
     if(_backend->get_frame_of_reference() == MAV_FRAME_LOCAL_NED){
         //don't subtract vehicle lean angles
-        x_rad = _angle_to_target.x;
-        y_rad = -_angle_to_target.y;
+        float x_rad = _angle_to_target.x;
+        float y_rad = -_angle_to_target.y;
     }else{ // assume MAV_FRAME_BODY_NED (i.e. a hard-mounted sensor)
         // subtract vehicle lean angles
-        x_rad = _angle_to_target.x - _ahrs.roll;
-        y_rad = -_angle_to_target.y + _ahrs.pitch;
+    	float x_rad = _angle_to_target.x - _ahrs.roll;
+    	float y_rad = -_angle_to_target.y + _ahrs.pitch;
     }
 
     // DON'T rotate to earth-frame angles
     //_ef_angle_to_target.x = y_rad*_ahrs.cos_yaw() - x_rad*_ahrs.sin_yaw();
     //_ef_angle_to_target.y = y_rad*_ahrs.sin_yaw() + x_rad*_ahrs.cos_yaw();
 
-    // get current altitude (constrained to no lower than 50cm)
-    float alt = MAX(alt_above_terrain_cm, 50.0f);
+    // get current altitude (constrained to no lower than 20cm)
+    float alt = MAX(alt_above_terrain_cm, 20.0f);
 
     // RE-PURPOSE this logged variable: Target Offset in roll/pitch directions
-    _ef_angle_to_target.x = alt*tanf(x_rad);
-    _ef_angle_to_target.y = alt*tanf(y_rad);
+    //_ef_angle_to_target.x = alt*tanf(x_rad);
+    //_ef_angle_to_target.y = alt*tanf(y_rad);
 
     /// DON'T update these here
     // convert earth-frame angles to earth-frame position offset
@@ -201,7 +201,7 @@ const Vector3f& AC_PrecLand::calc_angles_and_pos_out(float alt_above_terrain_cm,
 	float i_max = _pi_precland_xy.imax(); //
 	float i_gain = _pi_precland_xy.kI(); // set to 0; default is 1
 //	float d_gain = _pi_precland_xy.filt_hz(); // set to 100; previously 25
-	float d_gain = 100.0f*d_gain_temp;
+	float d_gain = 400.0f*d_gain_temp;
 	float ctrl_max = _pi_precland_xy.imax(); // set to 2 (degrees)
 //	float p_gain = _pi_precland_xy.kP();
 
@@ -255,12 +255,12 @@ const Vector3f& AC_PrecLand::calc_angles_and_pos_out(float alt_above_terrain_cm,
     //_ef_angle_to_target.x = y_rad*_ahrs.cos_yaw() - x_rad*_ahrs.sin_yaw();
     //_ef_angle_to_target.y = y_rad*_ahrs.sin_yaw() + x_rad*_ahrs.cos_yaw();
 
-    // get current altitude (constrained to no lower than 50cm)
-    float alt = MAX(alt_above_terrain_cm, 50.0f);
+    // get current altitude (constrained to no lower than 20cm)
+    float alt = MAX(alt_above_terrain_cm, 20.0f);
 
     // RE-PURPOSE this logged variable: Target Offset in roll/pitch directions
-    _ef_angle_to_target.x = alt*tanf(x_rad);
-    _ef_angle_to_target.y = alt*tanf(y_rad);
+    //_ef_angle_to_target.x = alt*tanf(x_rad);
+    //_ef_angle_to_target.y = alt*tanf(y_rad);
 
     /// RE-PURPOSE this logged variable: Control in roll/pitch directions (centi-degrees)
     // convert earth-frame angles to earth-frame position offset
@@ -279,15 +279,16 @@ const Vector3f& AC_PrecLand::calc_angles_and_pos_out(float alt_above_terrain_cm,
     _d_term_x = d_gain*(bf_roll_pos_offset-_prev_bf_roll_pos_offset);
     _d_term_y = d_gain*(bf_pitch_pos_offset-_prev_bf_pitch_pos_offset);
     // PSEUDO-AVERAGING
-    _d_term_x_avg -= _d_term_x_avg/20.0f;
-    _d_term_y_avg -= _d_term_y_avg/20.0f;
-    _d_term_x_avg += _d_term_x/20.0f;
-    _d_term_y_avg += _d_term_y/20.0f;
+    _d_term_x_avg = (0.005f*_d_term_x) + (1.0f - 0.005f)*_d_term_x_avg;
+    _d_term_y_avg = (0.005f*_d_term_y) + (1.0f - 0.005f)*_d_term_y_avg;
+    // LOG d_term
+    _ef_angle_to_target.x = _d_term_x_avg;
+    _ef_angle_to_target.y = _d_term_y_avg;
 
     // ADD D-control
     _target_pos_offset.x = p_gain*bf_roll_pos_offset + _d_term_x_avg;
     _target_pos_offset.y = -p_gain*bf_pitch_pos_offset - _d_term_y_avg;
-    _target_pos_offset.z = 0.0f;
+    _target_pos_offset.z = alt*tanf(x_rad);
 
     // PID, ADD I-control
     _integrator_roll_offset += bf_roll_pos_offset*i_gain;

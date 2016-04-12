@@ -690,6 +690,7 @@ struct PACKED log_Precland {
     float ef_angle_y;
     float pos_x;
     float pos_y;
+    float pos_z;
 };
 
 // Write an optical flow packet
@@ -713,7 +714,8 @@ void Copter::Log_Write_Precland()
         ef_angle_x      : ef_angle.x,
         ef_angle_y      : ef_angle.y,
         pos_x           : target_pos_ofs.x,
-        pos_y           : target_pos_ofs.y
+        pos_y           : target_pos_ofs.y,
+        pos_z           : target_pos_ofs.z
     };
     DataFlash.WriteBlock(&pkt, sizeof(pkt));
  #endif     // PRECISION_LANDING == ENABLED
@@ -760,7 +762,7 @@ const struct LogStructure Copter::log_structure[] = {
     { LOG_HELI_MSG, sizeof(log_Heli),
       "HELI",  "Qhh",         "TimeUS,DRRPM,ERRPM" },
     { LOG_PRECLAND_MSG, sizeof(log_Precland),
-      "PL",    "QBffffff",    "TimeUS,Heal,bX,bY,eX,eY,pX,pY" },
+      "PL",    "QBfffffff",    "TimeUS,Heal,anX,anY,dX,dY,cX,cY,pX" },
 };
 
 #if CLI_ENABLED == ENABLED
