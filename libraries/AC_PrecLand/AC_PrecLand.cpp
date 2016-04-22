@@ -282,13 +282,13 @@ const Vector3f& AC_PrecLand::calc_angles_and_pos_out(float alt_above_terrain_cm,
     _d_term_x_avg = (0.005f*_d_term_x) + (1.0f - 0.005f)*_d_term_x_avg;
     _d_term_y_avg = (0.005f*_d_term_y) + (1.0f - 0.005f)*_d_term_y_avg;
     // LOG d_term
-    _ef_angle_to_target.x = _d_term_x_avg;
-    _ef_angle_to_target.y = _d_term_y_avg;
+    _ef_angle_to_target.x = bf_roll_pos_offset;
+    _ef_angle_to_target.y = bf_pitch_pos_offset;
 
     // ADD D-control
     _target_pos_offset.x = p_gain*bf_roll_pos_offset + _d_term_x_avg;
     _target_pos_offset.y = -p_gain*bf_pitch_pos_offset - _d_term_y_avg;
-    _target_pos_offset.z = alt*tanf(x_rad);
+    _target_pos_offset.z = _d_term_y_avg;
 
     // PID, ADD I-control
     _integrator_roll_offset += bf_roll_pos_offset*i_gain;
