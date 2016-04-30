@@ -1603,19 +1603,31 @@ void GCS_MAVLINK::handleMessage(mavlink_message_t* msg)
             break;
         }
 
-        // convert thrust to climb rate
-        packet.thrust = constrain_float(packet.thrust, 0.0f, 1.0f);
         float climb_rate_cms = 0.0f;
-        if (is_equal(packet.thrust, 0.5f)) {
-            climb_rate_cms = 0.0f;
-        } else if (packet.thrust > 0.5f) {
-            // climb at up to WPNAV_SPEED_UP
-            climb_rate_cms = (packet.thrust - 0.5f) * 2.0f * copter.wp_nav.get_speed_up();
+
+        if(copter.control_mode == GUIDED) {
+            // convert thrust to climb rate
+            packet.thrust = constrain_float(packet.thrust, 0.0f, 1.0f);
+
+            if (is_equal(packet.thrust, 0.5f)) {
+                climb_rate_cms = 0.0f;
+            } else if (packet.thrust > 0.5f) {
+                // climb at up to WPNAV_SPEED_UP
+                climb_rate_cms = (packet.thrust - 0.5f) * 2.0f * copter.wp_nav.get_speed_up();
+            } else {
+                // descend at up to WPNAV_SPEED_DN
+                climb_rate_cms = (0.5f - packet.thrust) * 2.0f * -fabsf(copter.wp_nav.get_speed_down());
+            }
+
+            copter.guided_set_angle(Quaternion(packet.q[0],packet.q[1],packet.q[2],packet.q[3]), climb_rate_cms);
         } else {
-            // descend at up to WPNAV_SPEED_DN
-            climb_rate_cms = (0.5f - packet.thrust) * 2.0f * -fabsf(copter.wp_nav.get_speed_down());
+            // Take thrust in as a climb rate in m/s
+            climb_rate_cms = constrain_float(packet.thrust * 1.e2, -fabsf(copter.wp_nav.get_speed_down()),
+                                             copter.wp_nav.get_speed_up());
+
+            copter.guidednogps_set_angle(Quaternion(packet.q[0],packet.q[1],packet.q[2],packet.q[3]), climb_rate_cms);
         }
-        copter.guided_set_angle(Quaternion(packet.q[0],packet.q[1],packet.q[2],packet.q[3]), climb_rate_cms);
+
         break;
     }
 

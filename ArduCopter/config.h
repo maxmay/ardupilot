@@ -340,6 +340,9 @@
 #ifndef FLIGHT_MODE_6
  # define FLIGHT_MODE_6                  STABILIZE
 #endif
+#ifndef FLIGHT_MODE_7
+ # define FLIGHT_MODE_7                  STABILIZE
+#endif
 
 
 //////////////////////////////////////////////////////////////////////////////

@@ -789,6 +789,9 @@ private:
     void guided_limit_set(uint32_t timeout_ms, float alt_min_cm, float alt_max_cm, float horiz_max_cm);
     void guided_limit_init_time_and_pos();
     bool guided_limit_check();
+    bool guidednogps_init(bool ignore_checks);
+    void guidednogps_run();
+    void guidednogps_set_angle(const Quaternion &q, float climb_rate_cms);
     bool land_init(bool ignore_checks);
     void land_run();
     void land_gps_run();
