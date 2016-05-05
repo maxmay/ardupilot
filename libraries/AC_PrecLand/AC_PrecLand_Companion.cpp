@@ -26,6 +26,13 @@ void AC_PrecLand_Companion::init()
 //  returns true if new data available
 bool AC_PrecLand_Companion::update()
 {
+    //If it has been too long since a reading, bail
+    if(AP_HAL::millis() - _last_msg_ms > AC_PRECLAND_COMPANION_MAX_MSG_GOOD_MS) {
+        _new_estimate = false;
+        _state.healthy = false;
+    }
+    // We should also check the timestamp_us at some point
+
     // Mavlink commands are received asynchronous so all new data is processed by handle_msg()
     return _new_estimate;
 }
@@ -41,12 +48,12 @@ MAV_FRAME AC_PrecLand_Companion::get_frame_of_reference()
 //  y_angle_rad : pitch direction, postiive = target is forward (looking down)
 bool AC_PrecLand_Companion::get_angle_to_target(float &x_angle_rad, float &y_angle_rad)
 {
-    if (_new_estimate){
+    if (_state.healthy) {  //Keep returning the same value as long as we haven't timed out
         x_angle_rad = _angle_to_target.x;
         y_angle_rad = _angle_to_target.y;
 
         // reset and wait for new data
-        _new_estimate = false;
+//        _new_estimate = false;
         return true;
     }
 
@@ -60,6 +67,7 @@ void AC_PrecLand_Companion::handle_msg(mavlink_message_t* msg)
     mavlink_msg_landing_target_decode(msg, &packet);
 
     _timestamp_us = packet.time_usec;
+    _last_msg_ms = AP_HAL::millis();
     _frame = (MAV_FRAME) packet.frame;
     _angle_to_target.x = packet.angle_x;
     _angle_to_target.y = packet.angle_y;

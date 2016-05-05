@@ -10,6 +10,8 @@
  *                         by a companion computer (i.e. Odroid) communicating via MAVLink
  */
 
+#define AC_PRECLAND_COMPANION_MAX_MSG_GOOD_MS 500 //Updates are only considered good for 500ms
+
 class AC_PrecLand_Companion : public AC_PrecLand_Backend
 {
 public:
@@ -43,4 +45,5 @@ private:
     float               _distance_to_target;    // distance from the camera to target in meters
     uint64_t            _timestamp_us;          // timestamp when the image was captured(synced via UAVCAN)
     bool                _new_estimate;          // true if new data from the camera has been received
+    uint16_t            _last_msg_ms;           // the last time in ms an updated msg was received
 };

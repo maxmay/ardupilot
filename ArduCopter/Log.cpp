@@ -653,6 +653,8 @@ struct PACKED log_Precland {
     float ef_angle_y;
     float pos_x;
     float pos_y;
+    float bf_pos_x;
+    float bf_pos_y;
 };
 
 // Write an optical flow packet
@@ -667,6 +669,7 @@ void Copter::Log_Write_Precland()
     const Vector2f &bf_angle = precland.last_bf_angle_to_target();
     const Vector2f &ef_angle = precland.last_ef_angle_to_target();
     const Vector3f &target_pos_ofs = precland.last_target_pos_offset();
+    const Vector3f &bf_target_pos_ofs = precland.last_bf_target_pos_offset();
     struct log_Precland pkt = {
         LOG_PACKET_HEADER_INIT(LOG_PRECLAND_MSG),
         time_us         : AP_HAL::micros64(),
@@ -676,7 +679,9 @@ void Copter::Log_Write_Precland()
         ef_angle_x      : degrees(ef_angle.x),
         ef_angle_y      : degrees(ef_angle.y),
         pos_x           : target_pos_ofs.x,
-        pos_y           : target_pos_ofs.y
+        pos_y           : target_pos_ofs.y,
+        bf_pos_x        : bf_target_pos_ofs.x,
+        bf_pos_y        : bf_target_pos_ofs.y
     };
     DataFlash.WriteBlock(&pkt, sizeof(pkt));
  #endif     // PRECISION_LANDING == ENABLED
@@ -708,6 +713,39 @@ void Copter::Log_Write_GuidedTarget(uint8_t target_type, const Vector3f& pos_tar
         vel_target_x    : vel_target.x,
         vel_target_y    : vel_target.y,
         vel_target_z    : vel_target.z
+    };
+    DataFlash.WriteBlock(&pkt, sizeof(pkt));
+}
+
+// Guided_NOGPS logging
+struct PACKED log_GuidedNoGPS {
+    LOG_PACKET_HEADER;
+    uint64_t time_us;
+    uint8_t state;
+    float pos_target_x;
+    float pos_target_y;
+    float pi_cmd_x;
+    float pi_cmd_y;
+    float target_roll;
+    float target_pitch;
+    float target_yaw;
+    float target_climb_rate;
+};
+
+void Copter::Log_Write_GuidedNoGPS(uint8_t state, const Vector2f& pos_target, const Vector2f& pi_cmd, const Vector3f& att_target, float climb_rate_target)
+{
+    struct log_GuidedNoGPS pkt = {
+        LOG_PACKET_HEADER_INIT(LOG_GUIDEDNOGPS_MSG),
+        time_us         : AP_HAL::micros64(),
+        state           : state,
+        pos_target_x    : pos_target.x,
+        pos_target_y    : pos_target.y,
+        pi_cmd_x        : pi_cmd.x,
+        pi_cmd_y        : pi_cmd.y,
+        target_roll     : att_target.x,
+        target_pitch    : att_target.y,
+        target_yaw      : att_target.z,
+        target_climb_rate : climb_rate_target
     };
     DataFlash.WriteBlock(&pkt, sizeof(pkt));
 }
@@ -749,9 +787,11 @@ const struct LogStructure Copter::log_structure[] = {
     { LOG_HELI_MSG, sizeof(log_Heli),
       "HELI",  "Qff",         "TimeUS,DRRPM,ERRPM" },
     { LOG_PRECLAND_MSG, sizeof(log_Precland),
-      "PL",    "QBffffff",    "TimeUS,Heal,bX,bY,eX,eY,pX,pY" },
+      "PL",    "QBffffffff",    "TimeUS,Heal,bX,bY,eX,eY,pX,pY,bpX,bpY" },
     { LOG_GUIDEDTARGET_MSG, sizeof(log_GuidedTarget),
       "GUID",  "QBffffff",    "TimeUS,Type,pX,pY,pZ,vX,vY,vZ" },
+    { LOG_GUIDEDNOGPS_MSG, sizeof(log_GuidedNoGPS),
+      "NGPS",  "QBffffffff",    "TimeUS,State,pX,pY,cmdx,cmdy,tr,tp,ty,cr" },
 };
 
 #if CLI_ENABLED == ENABLED

@@ -48,6 +48,9 @@ public:
     // get_target_shift - returns 3D vector of earth-frame position adjustments to target
     Vector3f get_target_shift(const Vector3f& orig_target);
 
+    // get_target_rel_pos - returns 2D vector of body-frame relative target position
+    Vector2f get_target_rel_pos_xy();
+
     // handle_msg - Process a LANDING_TARGET mavlink message
     void handle_msg(mavlink_message_t* msg);
 
@@ -56,6 +59,7 @@ public:
     const Vector2f& last_bf_angle_to_target() const { return _angle_to_target; }
     const Vector2f& last_ef_angle_to_target() const { return _ef_angle_to_target; }
     const Vector3f& last_target_pos_offset() const { return _target_pos_offset; }
+    const Vector3f& last_bf_target_pos_offset() const { return _bf_target_pos_offset; }
 
     // parameter var table
     static const struct AP_Param::GroupInfo var_info[];
@@ -86,6 +90,7 @@ private:
     // output from controller
     bool                        _have_estimate;     // true if we have a recent estimated position offset
     Vector3f                    _target_pos_offset; // estimate target position offset from vehicle in earth-frame
+    Vector3f                    _bf_target_pos_offset; // estimate target position offset from vehicle in body-frame
 
     // backend state
     struct precland_state {

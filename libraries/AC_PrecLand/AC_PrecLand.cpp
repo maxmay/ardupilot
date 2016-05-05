@@ -114,6 +114,24 @@ Vector3f AC_PrecLand::get_target_shift(const Vector3f &orig_target)
     return shift;
 }
 
+// get_target_rel_pos_xy: Return a 2D vector of body-frame relative target position
+Vector2f AC_PrecLand::get_target_rel_pos_xy() {
+    Vector2f relpos; // default relpos initialized to zero
+
+    // do not shift target if not enabled or no position estimate
+    if (_backend == NULL || !_have_estimate) {
+        return relpos;
+    }
+
+    relpos.x = _bf_target_pos_offset.x;
+    relpos.y = _bf_target_pos_offset.y;
+
+    // record we have consumed this reading (perhaps there is a cleaner way to do this using timestamps)
+//    _have_estimate = false;
+
+    return relpos;
+}
+
 // calc_angles_and_pos - converts sensor's body-frame angles to earth-frame angles and position estimate
 //  raw sensor angles stored in _angle_to_target (might be in earth frame, or maybe body frame)
 //  earth-frame angles stored in _ef_angle_to_target
@@ -151,6 +169,11 @@ void AC_PrecLand::calc_angles_and_pos(float alt_above_terrain_cm)
 
     // get current altitude (constrained to no lower than 50cm)
     float alt = MAX(alt_above_terrain_cm, 50.0f);
+
+    // calculate body-frame position offset (left/forward)
+    _bf_target_pos_offset.x = alt*tanf(_angle_to_target.x);
+    _bf_target_pos_offset.y = alt*tanf(_angle_to_target.y);
+    _bf_target_pos_offset.z = 0; // not used
 
     // convert earth-frame angles to earth-frame position offset
     _target_pos_offset.x = alt*tanf(_ef_angle_to_target.x);

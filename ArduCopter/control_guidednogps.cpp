@@ -1,5 +1,6 @@
 /// -*- tab-width: 4; Mode: C++; c-basic-offset: 4; indent-tabs-mode: nil -*-
 #include "Copter.h"
+#include <AC_PID/AC_PI_2D.h>
 
 
 /*
@@ -7,7 +8,10 @@
  */
 
 #define GUIDEDNOGPS_ATTITUDE_TIMEOUT_MS  1000    // guidednogps mode's attitude controller times out after 1 second with no new updates
-
+#define GUIDEDNOGPS_VEL_XY_P VEL_XY_P
+#define GUIDEDNOGPS_VEL_XY_I VEL_XY_I
+#define GUIDEDNOGPS_VEL_XY_IMAX VEL_XY_IMAX
+#define GUIDEDNOGPS_VEL_XY_FILT_HZ VEL_XY_FILT_HZ
 struct {
     uint32_t update_time_ms;
     float roll_cd;
@@ -16,7 +20,8 @@ struct {
     float climb_rate_cms;
 } static guidednogps_angle_state = {0,0.0f, 0.0f, 0.0f, 0.0f};  // Stores attitude input controls
 
-static uint32_t attitude_override_time;                         // Last time the pilot overrode the attitude controller
+static AC_PI_2D guidednogps_pi_xy(GUIDEDNOGPS_VEL_XY_P, GUIDEDNOGPS_VEL_XY_I, GUIDEDNOGPS_VEL_XY_IMAX,
+                                       GUIDEDNOGPS_VEL_XY_FILT_HZ, MAIN_LOOP_SECONDS);
 
 // guidednogps_init - initialise guidednogps controller
 bool Copter::guidednogps_init(bool ignore_checks)
@@ -41,7 +46,13 @@ bool Copter::guidednogps_init(bool ignore_checks)
 
     // Initialize the angle control
     guidednogps_angle_state.update_time_ms = millis();
-    attitude_override_time = millis();
+
+    // Initialize the pi controller (for relative position input)
+    guidednogps_pi_xy.kP(g.pi_vel_xy.kP());
+    guidednogps_pi_xy.kI(0);//g.pi_vel_xy.kI());
+    guidednogps_pi_xy.imax(g.pi_vel_xy.imax());
+    guidednogps_pi_xy.filt_hz(g.pi_vel_xy.filt_hz());
+    guidednogps_pi_xy.reset_I();
 
     return true;
 }
@@ -107,6 +118,9 @@ void Copter::guidednogps_run()
         guidednogps_state = GuidedNoGPS_Flying;
     }
 
+    Vector2f target_xy;
+    Vector2f cmd;
+
     // Determine if we have new attitude input commands
     uint32_t tnow = millis();
     if (tnow - guidednogps_angle_state.update_time_ms < GUIDEDNOGPS_ATTITUDE_TIMEOUT_MS) {
@@ -114,24 +128,40 @@ void Copter::guidednogps_run()
         target_roll = guidednogps_angle_state.roll_cd;
         target_pitch = guidednogps_angle_state.pitch_cd;
 
-        float total_in = pythagorous2(target_roll, target_pitch);
-        float angle_max = attitude_control.get_althold_lean_angle_max();
-        if (total_in > angle_max) {
-            float ratio = angle_max / total_in;
-            target_roll *= ratio;
-            target_pitch *= ratio;
-        }
-
         // wrap yaw request
         target_yaw = wrap_180_cd_float(guidednogps_angle_state.yaw_cd);
-
-        // constrain climb rate to nav rate
-        target_climb_rate = constrain_float(guidednogps_angle_state.climb_rate_cms, -fabs(wp_nav.get_speed_down()), wp_nav.get_speed_up());
     } else {
         target_roll = target_pitch = 0;
         target_climb_rate = 0;
-        attitude_override_time = millis();  //Reset the timeout everytime the sticks aren't centered
+#if PRECISION_LANDING == ENABLED
+        //Check for input target data
+        if(precland.healthy()) {
+            //Run the controller
+            target_xy = precland.get_target_rel_pos_xy();
+            guidednogps_pi_xy.set_input(target_xy);
+            cmd = guidednogps_pi_xy.get_pi();
+            target_roll = cmd.x;
+            target_pitch = -cmd.y;
+        } else {
+            guidednogps_pi_xy.reset_I();
+        }
+#endif
     }
+
+    //Constrain lean angles
+    float total_in = pythagorous2(target_roll, target_pitch);
+    float angle_max = attitude_control.get_althold_lean_angle_max();
+    if (total_in > angle_max) {
+      float ratio = angle_max / total_in;
+      target_roll *= ratio;
+      target_pitch *= ratio;
+    }
+
+    // constrain climb rate to nav rate
+    target_climb_rate = constrain_float(guidednogps_angle_state.climb_rate_cms, -fabs(wp_nav.get_speed_down()), wp_nav.get_speed_up());
+
+    Vector3f att_target(target_pitch, target_roll, target_yaw);
+    Log_Write_GuidedNoGPS(guidednogps_state, target_xy, cmd, att_target, target_climb_rate);
 
     // Guided NOGPS State Machine
     switch (guidednogps_state) {
