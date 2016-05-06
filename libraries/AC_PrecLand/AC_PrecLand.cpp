@@ -115,21 +115,17 @@ Vector3f AC_PrecLand::get_target_shift(const Vector3f &orig_target)
 }
 
 // get_target_rel_pos_xy: Return a 2D vector of body-frame relative target position
-Vector2f AC_PrecLand::get_target_rel_pos_xy() {
-    Vector2f relpos; // default relpos initialized to zero
-
+bool AC_PrecLand::get_target_rel_pos_xy(Vector2f &relpos) {
     // do not shift target if not enabled or no position estimate
-    if (_backend == NULL || !_have_estimate) {
-        return relpos;
-    }
+    if (_backend == NULL || !_have_estimate)
+        return false;
 
     relpos.x = _bf_target_pos_offset.x;
     relpos.y = _bf_target_pos_offset.y;
 
-    // record we have consumed this reading (perhaps there is a cleaner way to do this using timestamps)
-//    _have_estimate = false;
+    // Do not reset the _have_estimate (let the backend decide)
 
-    return relpos;
+    return true;
 }
 
 // calc_angles_and_pos - converts sensor's body-frame angles to earth-frame angles and position estimate

@@ -49,7 +49,7 @@ public:
     Vector3f get_target_shift(const Vector3f& orig_target);
 
     // get_target_rel_pos - returns 2D vector of body-frame relative target position
-    Vector2f get_target_rel_pos_xy();
+    bool get_target_rel_pos_xy(Vector2f &relpos);
 
     // handle_msg - Process a LANDING_TARGET mavlink message
     void handle_msg(mavlink_message_t* msg);

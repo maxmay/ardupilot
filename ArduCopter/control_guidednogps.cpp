@@ -49,7 +49,7 @@ bool Copter::guidednogps_init(bool ignore_checks)
 
     // Initialize the pi controller (for relative position input)
     guidednogps_pi_xy.kP(g.pi_vel_xy.kP());
-    guidednogps_pi_xy.kI(0);//g.pi_vel_xy.kI());
+    guidednogps_pi_xy.kI(g.pi_vel_xy.kP()/5.e2);
     guidednogps_pi_xy.imax(g.pi_vel_xy.imax());
     guidednogps_pi_xy.filt_hz(g.pi_vel_xy.filt_hz());
     guidednogps_pi_xy.reset_I();
@@ -135,9 +135,8 @@ void Copter::guidednogps_run()
         target_climb_rate = 0;
 #if PRECISION_LANDING == ENABLED
         //Check for input target data
-        if(precland.healthy()) {
+        if(precland.get_target_rel_pos_xy(target_xy)) {
             //Run the controller
-            target_xy = precland.get_target_rel_pos_xy();
             guidednogps_pi_xy.set_input(target_xy);
             cmd = guidednogps_pi_xy.get_pi();
             target_roll = cmd.x;

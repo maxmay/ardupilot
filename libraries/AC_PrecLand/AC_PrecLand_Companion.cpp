@@ -17,8 +17,7 @@ AC_PrecLand_Companion::AC_PrecLand_Companion(const AC_PrecLand& frontend, AC_Pre
 // init - perform initialisation of this backend
 void AC_PrecLand_Companion::init()
 {
-    // set healthy
-    _state.healthy = true;
+    //Don't set the healthy state until we have a measurement
     _new_estimate = false;
 }
 
@@ -27,11 +26,8 @@ void AC_PrecLand_Companion::init()
 bool AC_PrecLand_Companion::update()
 {
     //If it has been too long since a reading, bail
-    if(AP_HAL::millis() - _last_msg_ms > AC_PRECLAND_COMPANION_MAX_MSG_GOOD_MS) {
+    if((AP_HAL::millis() - _last_msg_ms) > AC_PRECLAND_COMPANION_MAX_MSG_GOOD_MS)
         _new_estimate = false;
-        _state.healthy = false;
-    }
-    // We should also check the timestamp_us at some point
 
     // Mavlink commands are received asynchronous so all new data is processed by handle_msg()
     return _new_estimate;
@@ -48,16 +44,12 @@ MAV_FRAME AC_PrecLand_Companion::get_frame_of_reference()
 //  y_angle_rad : pitch direction, postiive = target is forward (looking down)
 bool AC_PrecLand_Companion::get_angle_to_target(float &x_angle_rad, float &y_angle_rad)
 {
-    if (_state.healthy) {  //Keep returning the same value as long as we haven't timed out
+    if(_new_estimate) { //update() checks for timeout
         x_angle_rad = _angle_to_target.x;
         y_angle_rad = _angle_to_target.y;
-
-        // reset and wait for new data
-//        _new_estimate = false;
-        return true;
     }
 
-    return false;
+    return _new_estimate;
 }
 
 void AC_PrecLand_Companion::handle_msg(mavlink_message_t* msg)
