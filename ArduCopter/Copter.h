@@ -672,7 +672,7 @@ private:
 #endif
     void Log_Write_Precland();
     void Log_Write_GuidedTarget(uint8_t target_type, const Vector3f& pos_target, const Vector3f& vel_target);
-    void Log_Write_GuidedNoGPS(uint8_t state, const Vector2f& pos_target, const Vector2f& pi_cmd, const Vector3f& att_target, float climb_rate_target);
+    void Log_Write_GuidedNoGPS(uint8_t state, const Vector2f& pos_target, const float pr, const float dr, const float ir, const float pp, const float dp, const float ip, const Vector3f& att_target, float climb_rate_target);
     void Log_Write_Vehicle_Startup_Messages();
     void Log_Read(uint16_t log_num, uint16_t start_page, uint16_t end_page);
     void start_logging() ;

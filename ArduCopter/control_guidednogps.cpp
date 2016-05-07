@@ -8,10 +8,11 @@
  */
 
 #define GUIDEDNOGPS_ATTITUDE_TIMEOUT_MS  1000    // guidednogps mode's attitude controller times out after 1 second with no new updates
-#define GUIDEDNOGPS_VEL_XY_P VEL_XY_P
-#define GUIDEDNOGPS_VEL_XY_I VEL_XY_I
-#define GUIDEDNOGPS_VEL_XY_IMAX VEL_XY_IMAX
-#define GUIDEDNOGPS_VEL_XY_FILT_HZ VEL_XY_FILT_HZ
+#define GUIDEDNOGPS_PID_P                   3.00
+#define GUIDEDNOGPS_PID_I                   0.10
+#define GUIDEDNOGPS_PID_D                   20.0
+#define GUIDEDNOGPS_PID_IMAX                 500
+#define GUIDEDNOGPS_PID_FILT_HZ             20.0
 struct {
     uint32_t update_time_ms;
     float roll_cd;
@@ -20,10 +21,19 @@ struct {
     float climb_rate_cms;
 } static guidednogps_angle_state = {0,0.0f, 0.0f, 0.0f, 0.0f};  // Stores attitude input controls
 
-static AC_PID guidednogps_pid_x(GUIDEDNOGPS_VEL_XY_P, GUIDEDNOGPS_VEL_XY_I, 0, GUIDEDNOGPS_VEL_XY_IMAX,
-                                       GUIDEDNOGPS_VEL_XY_FILT_HZ, MAIN_LOOP_SECONDS);
-static AC_PID guidednogps_pid_y(GUIDEDNOGPS_VEL_XY_P, GUIDEDNOGPS_VEL_XY_I, 0, GUIDEDNOGPS_VEL_XY_IMAX,
-                                       GUIDEDNOGPS_VEL_XY_FILT_HZ, MAIN_LOOP_SECONDS);
+static AC_PID guidednogps_pid_x(GUIDEDNOGPS_PID_P,
+                                GUIDEDNOGPS_PID_I,
+                                GUIDEDNOGPS_PID_D,
+                                GUIDEDNOGPS_PID_IMAX,
+                                GUIDEDNOGPS_PID_FILT_HZ,
+                                MAIN_LOOP_SECONDS);
+
+static AC_PID guidednogps_pid_y(GUIDEDNOGPS_PID_P,
+                                GUIDEDNOGPS_PID_I,
+                                GUIDEDNOGPS_PID_D,
+                                GUIDEDNOGPS_PID_IMAX,
+                                GUIDEDNOGPS_PID_FILT_HZ,
+                                MAIN_LOOP_SECONDS);
 
 // guidednogps_init - initialise guidednogps controller
 bool Copter::guidednogps_init(bool ignore_checks)
@@ -50,17 +60,7 @@ bool Copter::guidednogps_init(bool ignore_checks)
     guidednogps_angle_state.update_time_ms = millis();
 
     // Initialize the pid controller (for relative position input)
-    guidednogps_pid_x.kP(4);
-    guidednogps_pid_x.kI(0.001);
-    guidednogps_pid_x.kD(1.5);
-    guidednogps_pid_x.imax(0.444);
-    guidednogps_pid_x.filt_hz(20);
     guidednogps_pid_x.reset_I();
-    guidednogps_pid_y.kP(4);
-    guidednogps_pid_y.kI(0.001);
-    guidednogps_pid_y.kD(1.5);
-    guidednogps_pid_y.imax(0.444);
-    guidednogps_pid_y.filt_hz(20);
     guidednogps_pid_y.reset_I();
 
     return true;
@@ -172,7 +172,7 @@ void Copter::guidednogps_run()
     target_climb_rate = constrain_float(guidednogps_angle_state.climb_rate_cms, -fabs(wp_nav.get_speed_down()), wp_nav.get_speed_up());
 
     Vector3f att_target(target_pitch, target_roll, target_yaw);
-    Log_Write_GuidedNoGPS(guidednogps_state, target_xy, cmd, att_target, target_climb_rate);
+    Log_Write_GuidedNoGPS(guidednogps_state, target_xy, guidednogps_pid_x.get_p(), guidednogps_pid_x.get_d(), guidednogps_pid_x.get_i(), guidednogps_pid_y.get_p(), guidednogps_pid_y.get_d(), guidednogps_pid_y.get_i(), att_target, target_climb_rate);
 
     // Guided NOGPS State Machine
     switch (guidednogps_state) {

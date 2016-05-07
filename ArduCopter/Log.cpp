@@ -724,15 +724,19 @@ struct PACKED log_GuidedNoGPS {
     uint8_t state;
     float pos_target_x;
     float pos_target_y;
-    float pi_cmd_x;
-    float pi_cmd_y;
+    float pid_pr;
+    float pid_dr;
+    float pid_ir;
+    float pid_pp;
+    float pid_dp;
+    float pid_ip;
     float target_roll;
     float target_pitch;
     float target_yaw;
     float target_climb_rate;
 };
 
-void Copter::Log_Write_GuidedNoGPS(uint8_t state, const Vector2f& pos_target, const Vector2f& pi_cmd, const Vector3f& att_target, float climb_rate_target)
+void Copter::Log_Write_GuidedNoGPS(uint8_t state, const Vector2f& pos_target, const float pr, const float dr, const float ir, const float pp, const float dp, const float ip, const Vector3f& att_target, float climb_rate_target)
 {
     struct log_GuidedNoGPS pkt = {
         LOG_PACKET_HEADER_INIT(LOG_GUIDEDNOGPS_MSG),
@@ -740,8 +744,12 @@ void Copter::Log_Write_GuidedNoGPS(uint8_t state, const Vector2f& pos_target, co
         state           : state,
         pos_target_x    : pos_target.x,
         pos_target_y    : pos_target.y,
-        pi_cmd_x        : pi_cmd.x,
-        pi_cmd_y        : pi_cmd.y,
+        pid_pr          : pr,
+        pid_dr          : dr,
+        pid_ir          : ir,
+        pid_pp          : pp,
+        pid_dp          : dp,
+        pid_ip          : ip,
         target_roll     : att_target.x,
         target_pitch    : att_target.y,
         target_yaw      : att_target.z,
@@ -791,7 +799,7 @@ const struct LogStructure Copter::log_structure[] = {
     { LOG_GUIDEDTARGET_MSG, sizeof(log_GuidedTarget),
       "GUID",  "QBffffff",    "TimeUS,Type,pX,pY,pZ,vX,vY,vZ" },
     { LOG_GUIDEDNOGPS_MSG, sizeof(log_GuidedNoGPS),
-      "NGPS",  "QBffffffff",    "TimeUS,State,pX,pY,cmdx,cmdy,tr,tp,ty,cr" },
+      "NGPS",  "QBffffffffffff",    "TimeUS,State,pX,pY,pr,dr,ir,pp,dp,ip,tr,tp,ty,cr" },
 };
 
 #if CLI_ENABLED == ENABLED
