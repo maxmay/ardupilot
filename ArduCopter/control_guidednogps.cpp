@@ -20,7 +20,9 @@ struct {
     float climb_rate_cms;
 } static guidednogps_angle_state = {0,0.0f, 0.0f, 0.0f, 0.0f};  // Stores attitude input controls
 
-static AC_PI_2D guidednogps_pi_xy(GUIDEDNOGPS_VEL_XY_P, GUIDEDNOGPS_VEL_XY_I, GUIDEDNOGPS_VEL_XY_IMAX,
+static AC_PID guidednogps_pid_x(GUIDEDNOGPS_VEL_XY_P, GUIDEDNOGPS_VEL_XY_I, 0, GUIDEDNOGPS_VEL_XY_IMAX,
+                                       GUIDEDNOGPS_VEL_XY_FILT_HZ, MAIN_LOOP_SECONDS);
+static AC_PID guidednogps_pid_y(GUIDEDNOGPS_VEL_XY_P, GUIDEDNOGPS_VEL_XY_I, 0, GUIDEDNOGPS_VEL_XY_IMAX,
                                        GUIDEDNOGPS_VEL_XY_FILT_HZ, MAIN_LOOP_SECONDS);
 
 // guidednogps_init - initialise guidednogps controller
@@ -47,12 +49,19 @@ bool Copter::guidednogps_init(bool ignore_checks)
     // Initialize the angle control
     guidednogps_angle_state.update_time_ms = millis();
 
-    // Initialize the pi controller (for relative position input)
-    guidednogps_pi_xy.kP(g.pi_vel_xy.kP());
-    guidednogps_pi_xy.kI(g.pi_vel_xy.kP()/5.e2);
-    guidednogps_pi_xy.imax(g.pi_vel_xy.imax());
-    guidednogps_pi_xy.filt_hz(g.pi_vel_xy.filt_hz());
-    guidednogps_pi_xy.reset_I();
+    // Initialize the pid controller (for relative position input)
+    guidednogps_pid_x.kP(4);
+    guidednogps_pid_x.kI(0.001);
+    guidednogps_pid_x.kD(1.5);
+    guidednogps_pid_x.imax(0.444);
+    guidednogps_pid_x.filt_hz(20);
+    guidednogps_pid_x.reset_I();
+    guidednogps_pid_y.kP(4);
+    guidednogps_pid_y.kI(0.001);
+    guidednogps_pid_y.kD(1.5);
+    guidednogps_pid_y.imax(0.444);
+    guidednogps_pid_y.filt_hz(20);
+    guidednogps_pid_y.reset_I();
 
     return true;
 }
@@ -137,12 +146,15 @@ void Copter::guidednogps_run()
         //Check for input target data
         if(precland.get_target_rel_pos_xy(target_xy)) {
             //Run the controller
-            guidednogps_pi_xy.set_input(target_xy);
-            cmd = guidednogps_pi_xy.get_pi();
+            guidednogps_pid_x.set_input_filter_d(target_xy.x);
+            guidednogps_pid_y.set_input_filter_d(target_xy.y);
+            cmd.x = guidednogps_pid_x.get_pid();
+            cmd.y = guidednogps_pid_y.get_pid();
             target_roll = cmd.x;
             target_pitch = -cmd.y;
         } else {
-            guidednogps_pi_xy.reset_I();
+            guidednogps_pid_x.reset_I();
+            guidednogps_pid_y.reset_I();
         }
 #endif
     }
@@ -245,7 +257,8 @@ void Copter::guidednogps_run()
     case GuidedNoGPS_Flying:
         motors.set_desired_spool_state(AP_Motors::DESIRED_THROTTLE_UNLIMITED);
         // call attitude controller
-        attitude_control.input_euler_angle_roll_pitch_yaw(target_roll, target_pitch, target_yaw, true);
+        //attitude_control.input_euler_angle_roll_pitch_yaw(target_roll, target_pitch, target_yaw, true);
+        attitude_control.input_euler_angle_roll_pitch_euler_rate_yaw(target_roll, target_pitch, 0);
 
         // call throttle controller
         if (sonar_enabled && (sonar_alt_health >= SONAR_ALT_HEALTH_MAX)) {
