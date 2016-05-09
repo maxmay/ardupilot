@@ -180,6 +180,8 @@ public:
         k_param_fs_crash_check,
         k_param_throw_motor_start,
         k_param_terrain_follow,    // 94
+        k_param_pid_guidednogps_x, // 95
+        k_param_pid_guidednogps_y, // 96
 
         // 97: RSSI
         k_param_rssi = 97,
@@ -489,6 +491,9 @@ public:
     AC_P                    p_vel_z;
     AC_PID                  pid_accel_z;
 
+    AC_PID                  pid_guidednogps_x;
+    AC_PID                  pid_guidednogps_y;
+
     AC_P                    p_pos_xy;
     AC_P                    p_alt_hold;
 
@@ -522,6 +527,8 @@ public:
 
         p_vel_z                 (VEL_Z_P),
         pid_accel_z             (ACCEL_Z_P,       ACCEL_Z_I,        ACCEL_Z_D,      ACCEL_Z_IMAX,       ACCEL_Z_FILT_HZ,    MAIN_LOOP_SECONDS),
+        pid_guidednogps_x       (GNGPS_PID_P,     GNGPS_PID_I,      GNGPS_PID_D,    GNGPS_PID_IMAX,     GNGPS_PID_FILT_HZ,  GNGPS_PID_DT),
+        pid_guidednogps_y       (GNGPS_PID_P,     GNGPS_PID_I,      GNGPS_PID_D,    GNGPS_PID_IMAX,     GNGPS_PID_FILT_HZ,  GNGPS_PID_DT),
 
         // P controller	        initial P
         //----------------------------------------------------------------------

@@ -9,12 +9,7 @@
 
 #define GUIDEDNOGPS_ATTITUDE_TIMEOUT_MS     1000    // guidednogps mode's attitude controller times out after 1 second with no new updates
 #define GUIDEDNOGPS_ANGLEMEAS_TIMEOUT_MS     500    // angle input timeout
-#define GUIDEDNOGPS_PID_P                   3.50
-#define GUIDEDNOGPS_PID_I                   0.10
-#define GUIDEDNOGPS_PID_D                   1.00
-#define GUIDEDNOGPS_PID_IMAX                 500
-#define GUIDEDNOGPS_PID_FILT_HZ             20.0
-#define GUIDEDNOGPS_PID_DT                  0.20
+
 struct {
     uint32_t update_time_ms;
     float roll_cd;
@@ -24,20 +19,6 @@ struct {
 } static guidednogps_angle_state = {0,0.0f, 0.0f, 0.0f, 0.0f};  // Stores attitude input controls
 
 static uint32_t last_measurement_ms = 0; //For timing-out the measured precland angle.
-
-static AC_PID guidednogps_pid_x(GUIDEDNOGPS_PID_P,
-                                GUIDEDNOGPS_PID_I,
-                                GUIDEDNOGPS_PID_D,
-                                GUIDEDNOGPS_PID_IMAX,
-                                GUIDEDNOGPS_PID_FILT_HZ,
-                                GUIDEDNOGPS_PID_DT);
-
-static AC_PID guidednogps_pid_y(GUIDEDNOGPS_PID_P,
-                                GUIDEDNOGPS_PID_I,
-                                GUIDEDNOGPS_PID_D,
-                                GUIDEDNOGPS_PID_IMAX,
-                                GUIDEDNOGPS_PID_FILT_HZ,
-                                GUIDEDNOGPS_PID_DT);
 
 // guidednogps_init - initialise guidednogps controller
 bool Copter::guidednogps_init(bool ignore_checks)
@@ -64,8 +45,8 @@ bool Copter::guidednogps_init(bool ignore_checks)
     guidednogps_angle_state.update_time_ms = millis();
 
     // Initialize the pid controller (for relative position input)
-    guidednogps_pid_x.reset_I();
-    guidednogps_pid_y.reset_I();
+    g.pid_guidednogps_x.reset_I();
+    g.pid_guidednogps_y.reset_I();
     last_measurement_ms = millis();
 
     return true;
@@ -158,20 +139,20 @@ void Copter::guidednogps_run()
             //Run the controller
             if(last_measurement_ms != 0) {
                 float dt = (float)(AP_HAL::millis() - last_measurement_ms)/1.e3;
-                guidednogps_pid_x.set_dt(dt);
-                guidednogps_pid_y.set_dt(dt);
+                g.pid_guidednogps_x.set_dt(dt);
+                g.pid_guidednogps_y.set_dt(dt);
             }
             last_measurement_ms = AP_HAL::millis();
-            guidednogps_pid_x.set_input_filter_d(target_xy.x);
-            guidednogps_pid_y.set_input_filter_d(target_xy.y);
-            pids[0].p = guidednogps_pid_x.get_p();
-            pids[0].i = guidednogps_pid_x.get_i();
-            pids[0].d = guidednogps_pid_x.get_d();
-            pids[1].p = guidednogps_pid_y.get_p();
-            pids[1].i = guidednogps_pid_y.get_i();
-            pids[1].d = guidednogps_pid_y.get_d();
-            cmd.x = pids[0].p + pids[0].i + pids[0].d;//guidednogps_pid_x.get_pid();
-            cmd.y = pids[1].p + pids[1].i + pids[1].d;//guidednogps_pid_y.get_pid();
+            g.pid_guidednogps_x.set_input_filter_d(target_xy.x);
+            g.pid_guidednogps_y.set_input_filter_d(target_xy.y);
+            pids[0].p = g.pid_guidednogps_x.get_p();
+            pids[0].i = g.pid_guidednogps_x.get_i();
+            pids[0].d = g.pid_guidednogps_x.get_d();
+            pids[1].p = g.pid_guidednogps_y.get_p();
+            pids[1].i = g.pid_guidednogps_y.get_i();
+            pids[1].d = g.pid_guidednogps_y.get_d();
+            cmd.x = pids[0].p + pids[0].i + pids[0].d;//g.pid_guidednogps_x.get_pid();
+            cmd.y = pids[1].p + pids[1].i + pids[1].d;//g.pid_guidednogps_y.get_pid();
         }
 
         if(tnow - last_measurement_ms < GUIDEDNOGPS_ANGLEMEAS_TIMEOUT_MS) { //If we have good data
@@ -180,8 +161,8 @@ void Copter::guidednogps_run()
         } else {
             cmd.x = 0;
             cmd.y = 0;
-            guidednogps_pid_x.reset_I();
-            guidednogps_pid_y.reset_I();
+            g.pid_guidednogps_x.reset_I();
+            g.pid_guidednogps_y.reset_I();
         }
 #endif
     }

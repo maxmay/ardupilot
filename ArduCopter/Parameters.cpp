@@ -721,6 +721,74 @@ const AP_Param::Info Copter::var_info[] = {
     // @User: Standard
     GGROUP(p_pos_xy,                "POS_XY_", AC_P),
 
+    // @Param: GNGPS_X_P
+    // @DisplayName: Guided_NoGPS roll controller P gain
+    // @Description: Guided_NoGPS roll controller P gain.  Converts the difference between desired target angle into a copter acceleration
+    // @Range: 0.500 1.500
+    // @Increment: 0.05
+    // @User: Standard
+
+    // @Param: GNGPS_X_I
+    // @DisplayName: Guided_NoGPS roll controller I gain
+    // @Description: Guided_NoGPS roll controller I gain.  Corrects long-term difference in desired target angle
+    // @Range: 0.000 3.000
+    // @User: Standard
+
+    // @Param: GNGPS_X_IMAX
+    // @DisplayName: Guided_NoGPS roll controller I gain maximum
+    // @Description: Guided_NoGPS roll controller I gain maximum.  Constrains the maximum pwm that the I term will generate
+    // @Range: 0 1000
+    // @Units: Percent*10
+    // @User: Standard
+
+    // @Param: GNGPS_X_D
+    // @DisplayName: Guided_NoGPS roll controller D gain
+    // @Description: Guided_NoGPS roll controller D gain.  Compensates for short-term change in desired target angle
+    // @Range: 0.000 0.400
+    // @User: Standard
+
+    // @Param: GNGPS_X_FILT_HZ
+    // @DisplayName: Guided_NoGPS roll filter
+    // @Description: Filter applied to acceleration to reduce noise.  Lower values reduce noise but add delay.
+    // @Range: 1.000 100.000
+    // @Units: Hz
+    // @User: Standard
+    GGROUP(pid_guidednogps_x, "GNGPS_X_", AC_PID),
+
+    // @Param: GNGPS_Y_P
+    // @DisplayName: Guided_NoGPS pitch controller P gain
+    // @Description: Guided_NoGPS pitch controller P gain.  Converts the difference between desired target angle into a copter acceleration
+    // @Range: 0.500 1.500
+    // @Increment: 0.05
+    // @User: Standard
+
+    // @Param: GNGPS_Y_I
+    // @DisplayName: Guided_NoGPS pitch controller I gain
+    // @Description: Guided_NoGPS pitch controller I gain.  Corrects long-term difference in desired target angle
+    // @Range: 0.000 3.000
+    // @User: Standard
+
+    // @Param: GNGPS_Y_IMAX
+    // @DisplayName: Guided_NoGPS pitch controller I gain maximum
+    // @Description: Guided_NoGPS pitch controller I gain maximum.  Constrains the maximum pwm that the I term will generate
+    // @Range: 0 1000
+    // @Units: Percent*10
+    // @User: Standard
+
+    // @Param: GNGPS_Y_D
+    // @DisplayName: Guided_NoGPS pitch controller D gain
+    // @Description: Guided_NoGPS pitch controller D gain.  Compensates for short-term change in desired target angle
+    // @Range: 0.000 0.400
+    // @User: Standard
+
+    // @Param: GNGPS_Y_FILT_HZ
+    // @DisplayName: Guided_NoGPS pitch filter
+    // @Description: Filter applied to acceleration to reduce noise.  Lower values reduce noise but add delay.
+    // @Range: 1.000 100.000
+    // @Units: Hz
+    // @User: Standard
+    GGROUP(pid_guidednogps_y, "GNGPS_Y_", AC_PID),
+
     // variables not in the g class which contain EEPROM saved variables
 
 #if CAMERA == ENABLED

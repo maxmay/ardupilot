@@ -615,6 +615,26 @@
 # define AUTO_DISARMING_DELAY  10
 #endif
 
+// guided_nogps attitude control gains
+#ifndef GNGPS_PID_P
+#define GNGPS_PID_P                   3.50
+#endif
+#ifndef GNGPS_PID_I
+#define GNGPS_PID_I                   0.10
+#endif
+#ifndef GNGPS_PID_D
+#define GNGPS_PID_D                   1.00
+#endif
+#ifndef GNGPS_PID_IMAX
+#define GNGPS_PID_IMAX                 500
+#endif
+#ifndef GNGPS_PID_FILT_HZ
+#define GNGPS_PID_FILT_HZ             20.0
+#endif
+#ifndef GNGPS_PID_DT
+#define GNGPS_PID_DT                  0.20
+#endif
+
 //////////////////////////////////////////////////////////////////////////////
 // Dataflash logging control
 //
