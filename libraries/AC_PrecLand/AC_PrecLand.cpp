@@ -123,8 +123,9 @@ bool AC_PrecLand::get_target_rel_pos_xy(Vector2f &relpos) {
     relpos.x = _bf_target_pos_offset.x;
     relpos.y = _bf_target_pos_offset.y;
 
-    // Do not reset the _have_estimate (let the backend decide)
+    _have_estimate = false;
 
+    // Return that we have a good estimate
     return true;
 }
 

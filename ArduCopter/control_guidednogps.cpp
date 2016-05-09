@@ -7,12 +7,14 @@
  * control_guidednogps.pde - init and run calls for guidednogps, flight mode
  */
 
-#define GUIDEDNOGPS_ATTITUDE_TIMEOUT_MS  1000    // guidednogps mode's attitude controller times out after 1 second with no new updates
-#define GUIDEDNOGPS_PID_P                   3.00
+#define GUIDEDNOGPS_ATTITUDE_TIMEOUT_MS     1000    // guidednogps mode's attitude controller times out after 1 second with no new updates
+#define GUIDEDNOGPS_ANGLEMEAS_TIMEOUT_MS     500    // angle input timeout
+#define GUIDEDNOGPS_PID_P                   3.50
 #define GUIDEDNOGPS_PID_I                   0.10
-#define GUIDEDNOGPS_PID_D                   20.0
+#define GUIDEDNOGPS_PID_D                   1.00
 #define GUIDEDNOGPS_PID_IMAX                 500
 #define GUIDEDNOGPS_PID_FILT_HZ             20.0
+#define GUIDEDNOGPS_PID_DT                  0.20
 struct {
     uint32_t update_time_ms;
     float roll_cd;
@@ -21,19 +23,21 @@ struct {
     float climb_rate_cms;
 } static guidednogps_angle_state = {0,0.0f, 0.0f, 0.0f, 0.0f};  // Stores attitude input controls
 
+static uint32_t last_measurement_ms = 0; //For timing-out the measured precland angle.
+
 static AC_PID guidednogps_pid_x(GUIDEDNOGPS_PID_P,
                                 GUIDEDNOGPS_PID_I,
                                 GUIDEDNOGPS_PID_D,
                                 GUIDEDNOGPS_PID_IMAX,
                                 GUIDEDNOGPS_PID_FILT_HZ,
-                                MAIN_LOOP_SECONDS);
+                                GUIDEDNOGPS_PID_DT);
 
 static AC_PID guidednogps_pid_y(GUIDEDNOGPS_PID_P,
                                 GUIDEDNOGPS_PID_I,
                                 GUIDEDNOGPS_PID_D,
                                 GUIDEDNOGPS_PID_IMAX,
                                 GUIDEDNOGPS_PID_FILT_HZ,
-                                MAIN_LOOP_SECONDS);
+                                GUIDEDNOGPS_PID_DT);
 
 // guidednogps_init - initialise guidednogps controller
 bool Copter::guidednogps_init(bool ignore_checks)
@@ -62,6 +66,7 @@ bool Copter::guidednogps_init(bool ignore_checks)
     // Initialize the pid controller (for relative position input)
     guidednogps_pid_x.reset_I();
     guidednogps_pid_y.reset_I();
+    last_measurement_ms = millis();
 
     return true;
 }
@@ -127,8 +132,13 @@ void Copter::guidednogps_run()
         guidednogps_state = GuidedNoGPS_Flying;
     }
 
-    Vector2f target_xy;
-    Vector2f cmd;
+    static Vector2f target_xy; // static for logging (kludgy)
+    static Vector2f cmd = {0.0, 0.0}; //Make this static so we can store the last command
+    static struct {
+      float p;
+      float i;
+      float d;
+    } pids[2] = {{0, 0, 0},{0,0,0}};
 
     // Determine if we have new attitude input commands
     uint32_t tnow = millis();
@@ -144,15 +154,32 @@ void Copter::guidednogps_run()
         target_climb_rate = 0;
 #if PRECISION_LANDING == ENABLED
         //Check for input target data
-        if(precland.get_target_rel_pos_xy(target_xy)) {
+        if(precland.get_target_rel_pos_xy(target_xy)) { //If this is a new measurement
             //Run the controller
+            if(last_measurement_ms != 0) {
+                float dt = (float)(AP_HAL::millis() - last_measurement_ms)/1.e3;
+                guidednogps_pid_x.set_dt(dt);
+                guidednogps_pid_y.set_dt(dt);
+            }
+            last_measurement_ms = AP_HAL::millis();
             guidednogps_pid_x.set_input_filter_d(target_xy.x);
             guidednogps_pid_y.set_input_filter_d(target_xy.y);
-            cmd.x = guidednogps_pid_x.get_pid();
-            cmd.y = guidednogps_pid_y.get_pid();
+            pids[0].p = guidednogps_pid_x.get_p();
+            pids[0].i = guidednogps_pid_x.get_i();
+            pids[0].d = guidednogps_pid_x.get_d();
+            pids[1].p = guidednogps_pid_y.get_p();
+            pids[1].i = guidednogps_pid_y.get_i();
+            pids[1].d = guidednogps_pid_y.get_d();
+            cmd.x = pids[0].p + pids[0].i + pids[0].d;//guidednogps_pid_x.get_pid();
+            cmd.y = pids[1].p + pids[1].i + pids[1].d;//guidednogps_pid_y.get_pid();
+        }
+
+        if(tnow - last_measurement_ms < GUIDEDNOGPS_ANGLEMEAS_TIMEOUT_MS) { //If we have good data
             target_roll = cmd.x;
             target_pitch = -cmd.y;
         } else {
+            cmd.x = 0;
+            cmd.y = 0;
             guidednogps_pid_x.reset_I();
             guidednogps_pid_y.reset_I();
         }
@@ -172,7 +199,7 @@ void Copter::guidednogps_run()
     target_climb_rate = constrain_float(guidednogps_angle_state.climb_rate_cms, -fabs(wp_nav.get_speed_down()), wp_nav.get_speed_up());
 
     Vector3f att_target(target_pitch, target_roll, target_yaw);
-    Log_Write_GuidedNoGPS(guidednogps_state, target_xy, guidednogps_pid_x.get_p(), guidednogps_pid_x.get_d(), guidednogps_pid_x.get_i(), guidednogps_pid_y.get_p(), guidednogps_pid_y.get_d(), guidednogps_pid_y.get_i(), att_target, target_climb_rate);
+    Log_Write_GuidedNoGPS(guidednogps_state, target_xy, pids[0].p, pids[0].d, pids[0].i, pids[1].p, pids[1].d, pids[1].i, att_target, target_climb_rate);
 
     // Guided NOGPS State Machine
     switch (guidednogps_state) {
