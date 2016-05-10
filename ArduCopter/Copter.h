@@ -793,6 +793,7 @@ private:
     bool guidednogps_init(bool ignore_checks);
     void guidednogps_run();
     void guidednogps_set_angle(const Quaternion &q, float climb_rate_cms);
+    void guidednogps_set_rel_vel(Vector3f vel_vector);
     bool land_init(bool ignore_checks);
     void land_run();
     void land_gps_run();

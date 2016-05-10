@@ -1638,7 +1638,9 @@ void GCS_MAVLINK::handleMessage(mavlink_message_t* msg)
         mavlink_msg_set_position_target_local_ned_decode(msg, &packet);
 
         // exit if vehicle is not in Guided mode or Auto-Guided mode
-        if ((copter.control_mode != GUIDED) && !(copter.control_mode == AUTO && copter.auto_mode == Auto_NavGuided)) {
+        if ((copter.control_mode != GUIDED) &&
+            !(copter.control_mode == AUTO && copter.auto_mode == Auto_NavGuided) &&
+            (copter.control_mode != GUIDED_NOGPS)) {
             break;
         }
 
@@ -1697,7 +1699,11 @@ void GCS_MAVLINK::handleMessage(mavlink_message_t* msg)
         if (!pos_ignore && !vel_ignore && acc_ignore) {
             copter.guided_set_destination_posvel(pos_vector, vel_vector);
         } else if (pos_ignore && !vel_ignore && acc_ignore) {
-            copter.guided_set_velocity(vel_vector);
+            if(copter.control_mode == GUIDED) {
+                copter.guided_set_velocity(vel_vector);
+            } else {
+                copter.guidednogps_set_rel_vel(vel_vector);
+            }
         } else if (!pos_ignore && vel_ignore && acc_ignore) {
             copter.guided_set_destination(pos_vector);
         } else {

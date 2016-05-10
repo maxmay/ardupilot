@@ -18,6 +18,13 @@ struct {
     float climb_rate_cms;
 } static guidednogps_angle_state = {0,0.0f, 0.0f, 0.0f, 0.0f};  // Stores attitude input controls
 
+struct {
+  uint32_t update_time_ms;
+  float vx;
+  float vy;
+  float vz;
+} static guidednogps_vel_cmd = {0,0.0f, 0.0f, 0.0f}; //Stores velocity input commands
+
 static uint32_t last_measurement_ms = 0; //For timing-out the measured precland angle.
 
 // guidednogps_init - initialise guidednogps controller
@@ -42,12 +49,15 @@ bool Copter::guidednogps_init(bool ignore_checks)
     takeoff_stop();
 
     // Initialize the angle control
-    guidednogps_angle_state.update_time_ms = millis();
+    guidednogps_angle_state.update_time_ms = 0;
+
+    // Initialize the vel input
+    guidednogps_vel_cmd.update_time_ms = 0;
 
     // Initialize the pid controller (for relative position input)
     g.pid_guidednogps_x.reset_I();
     g.pid_guidednogps_y.reset_I();
-    last_measurement_ms = millis();
+    last_measurement_ms = 0;
 
     return true;
 }
@@ -68,6 +78,16 @@ void Copter::guidednogps_set_angle(const Quaternion &q, float climb_rate_cms)
     Log_Write_GuidedTarget(Guided_Angle,
         Vector3f(guidednogps_angle_state.roll_cd, guidednogps_angle_state.pitch_cd, guidednogps_angle_state.yaw_cd),
         Vector3f(0.0f, 0.0f, guidednogps_angle_state.climb_rate_cms));
+}
+
+// relative velocity input.  This is used relative to vector input and alt measurement
+void Copter::guidednogps_set_rel_vel(Vector3f vel_vector)
+{
+    //Ignore vx and vy
+    guidednogps_vel_cmd.vx = vel_vector.x;
+    guidednogps_vel_cmd.vy = vel_vector.y;
+    guidednogps_vel_cmd.vz = vel_vector.z;
+    guidednogps_vel_cmd.update_time_ms = millis();
 }
 
 // guidednogps_run - runs the guidednogps controller
@@ -127,6 +147,7 @@ void Copter::guidednogps_run()
         // constrain desired lean angles
         target_roll = guidednogps_angle_state.roll_cd;
         target_pitch = guidednogps_angle_state.pitch_cd;
+        target_climb_rate = guidednogps_angle_state.climb_rate_cms;
 
         // wrap yaw request
         target_yaw = wrap_180_cd_float(guidednogps_angle_state.yaw_cd);
@@ -167,6 +188,13 @@ void Copter::guidednogps_run()
 #endif
     }
 
+    //Check for velocity inputs
+    if(tnow - guidednogps_vel_cmd.update_time_ms < GUIDEDNOGPS_ANGLEMEAS_TIMEOUT_MS) {
+      target_climb_rate = guidednogps_vel_cmd.vz; //Already in cms
+    } else {
+      target_climb_rate = 0;
+    }
+
     //Constrain lean angles
     float total_in = pythagorous2(target_roll, target_pitch);
     float angle_max = attitude_control.get_althold_lean_angle_max();
@@ -177,7 +205,7 @@ void Copter::guidednogps_run()
     }
 
     // constrain climb rate to nav rate
-    target_climb_rate = constrain_float(guidednogps_angle_state.climb_rate_cms, -fabs(wp_nav.get_speed_down()), wp_nav.get_speed_up());
+    target_climb_rate = constrain_float(target_climb_rate, -fabs(wp_nav.get_speed_down()), wp_nav.get_speed_up());
 
     Vector3f att_target(target_pitch, target_roll, target_yaw);
     Log_Write_GuidedNoGPS(guidednogps_state, target_xy, pids[0].p, pids[0].d, pids[0].i, pids[1].p, pids[1].d, pids[1].i, att_target, target_climb_rate);
