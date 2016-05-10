@@ -69,7 +69,7 @@ void Copter::guidednogps_set_angle(const Quaternion &q, float climb_rate_cms)
     q.to_euler(guidednogps_angle_state.roll_cd, guidednogps_angle_state.pitch_cd, guidednogps_angle_state.yaw_cd);
     guidednogps_angle_state.roll_cd = ToDeg(guidednogps_angle_state.roll_cd) * 100.0f;
     guidednogps_angle_state.pitch_cd = ToDeg(guidednogps_angle_state.pitch_cd) * 100.0f;
-    guidednogps_angle_state.yaw_cd = wrap_180_cd_float(ToDeg(guidednogps_angle_state.yaw_cd) * 100.0f);
+    guidednogps_angle_state.yaw_cd = wrap_180_cd(ToDeg(guidednogps_angle_state.yaw_cd) * 100.0f);
 
     guidednogps_angle_state.climb_rate_cms = climb_rate_cms;
     guidednogps_angle_state.update_time_ms = millis();
@@ -150,7 +150,7 @@ void Copter::guidednogps_run()
         target_climb_rate = guidednogps_angle_state.climb_rate_cms;
 
         // wrap yaw request
-        target_yaw = wrap_180_cd_float(guidednogps_angle_state.yaw_cd);
+        target_yaw = wrap_180_cd(guidednogps_angle_state.yaw_cd);
     } else {
         target_roll = target_pitch = 0;
         target_climb_rate = 0;
@@ -196,7 +196,7 @@ void Copter::guidednogps_run()
     }
 
     //Constrain lean angles
-    float total_in = pythagorous2(target_roll, target_pitch);
+    float total_in = norm(target_roll, target_pitch);
     float angle_max = attitude_control.get_althold_lean_angle_max();
     if (total_in > angle_max) {
       float ratio = angle_max / total_in;
@@ -225,7 +225,7 @@ void Copter::guidednogps_run()
         // Multicopter do not stabilize roll/pitch/yaw when disarmed
         attitude_control.set_throttle_out_unstabilized(0,true,g.throttle_filt);
 #endif  // HELI_FRAME
-        pos_control.relax_alt_hold_controllers(get_throttle_pre_takeoff(channel_throttle->control_in)-throttle_average);
+        pos_control.relax_alt_hold_controllers(get_throttle_pre_takeoff(channel_throttle->get_control_in())-throttle_average);
         break;
 
     case GuidedNoGPS_MotorStop:
@@ -241,7 +241,7 @@ void Copter::guidednogps_run()
 #else   // Multicopter do not stabilize roll/pitch/yaw when motor are stopped
         motors.set_desired_spool_state(AP_Motors::DESIRED_SHUT_DOWN);
         attitude_control.set_throttle_out_unstabilized(0,true,g.throttle_filt);
-        pos_control.relax_alt_hold_controllers(get_throttle_pre_takeoff(channel_throttle->control_in)-throttle_average);
+        pos_control.relax_alt_hold_controllers(get_throttle_pre_takeoff(channel_throttle->get_control_in())-throttle_average);
 #endif  // HELI_FRAME
         break;
 
@@ -277,9 +277,9 @@ void Copter::guidednogps_run()
         attitude_control.set_yaw_target_to_current_heading();
         // call attitude controller
         attitude_control.input_euler_angle_roll_pitch_yaw(target_roll, target_pitch, target_yaw, true);
-        attitude_control.set_throttle_out(get_throttle_pre_takeoff(channel_throttle->control_in),false,g.throttle_filt);
+        attitude_control.set_throttle_out(get_throttle_pre_takeoff(channel_throttle->get_control_in()),false,g.throttle_filt);
 #else   // Multicopter stabilize roll/pitch/yaw when landed
-        attitude_control.set_throttle_out(get_throttle_pre_takeoff(channel_throttle->control_in),false,g.throttle_filt);
+        attitude_control.set_throttle_out(get_throttle_pre_takeoff(channel_throttle->get_control_in()),false,g.throttle_filt);
         // if throttle zero reset attitude and exit immediately
         if (ap.throttle_zero) {
             motors.set_desired_spool_state(AP_Motors::DESIRED_SPIN_WHEN_ARMED);
@@ -287,7 +287,7 @@ void Copter::guidednogps_run()
             motors.set_desired_spool_state(AP_Motors::DESIRED_THROTTLE_UNLIMITED);
         }
 #endif
-        pos_control.relax_alt_hold_controllers(get_throttle_pre_takeoff(channel_throttle->control_in)-throttle_average);
+        pos_control.relax_alt_hold_controllers(get_throttle_pre_takeoff(channel_throttle->get_control_in())-throttle_average);
         break;
 
     case GuidedNoGPS_Flying:
