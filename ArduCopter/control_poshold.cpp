@@ -141,10 +141,11 @@ void Copter::poshold_run()
     pos_control.set_accel_z(g.pilot_accel_z);
 
     // if not auto armed or motor interlock not enabled set throttle to zero and exit immediately
-    if(!ap.auto_armed || !motors.get_interlock()) {
+    if (!motors.armed() || !ap.auto_armed || !motors.get_interlock()) {
+        motors.set_desired_spool_state(AP_Motors::DESIRED_SPIN_WHEN_ARMED);
         wp_nav.init_loiter_target();
         attitude_control.set_throttle_out_unstabilized(0,true,g.throttle_filt);
-        pos_control.relax_alt_hold_controllers(get_throttle_pre_takeoff(channel_throttle->control_in)-throttle_average);
+        pos_control.relax_alt_hold_controllers(get_throttle_pre_takeoff(channel_throttle->get_control_in())-throttle_average);
         return;
     }
 
@@ -154,17 +155,17 @@ void Copter::poshold_run()
         update_simple_mode();
 
         // get pilot's desired yaw rate
-        target_yaw_rate = get_pilot_desired_yaw_rate(channel_yaw->control_in);
+        target_yaw_rate = get_pilot_desired_yaw_rate(channel_yaw->get_control_in());
 
         // get pilot desired climb rate (for alt-hold mode and take-off)
-        target_climb_rate = get_pilot_desired_climb_rate(channel_throttle->control_in);
+        target_climb_rate = get_pilot_desired_climb_rate(channel_throttle->get_control_in());
         target_climb_rate = constrain_float(target_climb_rate, -g.pilot_velocity_z_max, g.pilot_velocity_z_max);
 
         // get takeoff adjusted pilot and takeoff climb rates
         takeoff_get_climb_rates(target_climb_rate, takeoff_climb_rate);
 
         // check for take-off
-        if (ap.land_complete && (takeoff_state.running || channel_throttle->control_in > get_takeoff_trigger_throttle())) {
+        if (ap.land_complete && (takeoff_state.running || channel_throttle->get_control_in() > get_takeoff_trigger_throttle())) {
             if (!takeoff_state.running) {
                 takeoff_timer_start(constrain_float(g.pilot_takeoff_alt,0.0f,1000.0f));
             }
@@ -183,14 +184,20 @@ void Copter::poshold_run()
 
     // if landed initialise loiter targets, set throttle to zero and exit
     if (ap.land_complete) {
+        // if throttle zero reset attitude and exit immediately
+        if (ap.throttle_zero) {
+            motors.set_desired_spool_state(AP_Motors::DESIRED_SPIN_WHEN_ARMED);
+        }else{
+            motors.set_desired_spool_state(AP_Motors::DESIRED_THROTTLE_UNLIMITED);
+        }
         wp_nav.init_loiter_target();
         // move throttle to between minimum and non-takeoff-throttle to keep us on the ground
-        attitude_control.set_throttle_out_unstabilized(get_throttle_pre_takeoff(channel_throttle->control_in),true,g.throttle_filt);
-        pos_control.relax_alt_hold_controllers(get_throttle_pre_takeoff(channel_throttle->control_in)-throttle_average);
+        attitude_control.set_throttle_out(get_throttle_pre_takeoff(channel_throttle->get_control_in()),false,g.throttle_filt);
+        pos_control.relax_alt_hold_controllers(get_throttle_pre_takeoff(channel_throttle->get_control_in())-throttle_average);
         return;
     }else{
         // convert pilot input to lean angles
-        get_pilot_desired_lean_angles(channel_roll->control_in, channel_pitch->control_in, target_roll, target_pitch, aparm.angle_max);
+        get_pilot_desired_lean_angles(channel_roll->get_control_in(), channel_pitch->get_control_in(), target_roll, target_pitch, aparm.angle_max);
 
         // convert inertial nav earth-frame velocities to body-frame
         // To-Do: move this to AP_Math (or perhaps we already have a function to do this)
@@ -388,6 +395,9 @@ void Copter::poshold_run()
                 poshold.pitch = poshold_mix_controls(controller_to_pilot_pitch_mix, poshold.controller_final_pitch, poshold.pilot_pitch + poshold.wind_comp_pitch);
                 break;
         }
+
+        // set motors to full range
+        motors.set_desired_spool_state(AP_Motors::DESIRED_THROTTLE_UNLIMITED);
 
         //
         // Shared roll & pitch states (POSHOLD_BRAKE_TO_LOITER and POSHOLD_LOITER)

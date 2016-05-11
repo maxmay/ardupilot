@@ -5,9 +5,7 @@
 
    - transfers blocks of the open log file to a client using MAVLink
  */
-
-#ifndef DATAFLASH_MAVLINK_H
-#define DATAFLASH_MAVLINK_H
+#pragma once
 
 #define DATAFLASH_MAVLINK_SUPPORT 1
 
@@ -37,6 +35,8 @@ public:
     void Init() override;
 
     bool logging_started() { return _logging_started; }
+
+    void stop_logging();
 
     /* Write a block of data at current offset */
     bool WritePrioritisedBlock(const void *pBuffer, uint16_t size,
@@ -192,6 +192,3 @@ private:
 };
 
 #endif // DATAFLASH_MAVLINK_SUPPORT
-
-#endif // DATAFLASH_MAVLINK_H
-

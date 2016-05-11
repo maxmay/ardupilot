@@ -18,11 +18,10 @@
 //  Septentrio GPS driver for ArduPilot.
 //	Code by Michael Oborne
 //
-
-#ifndef __AP_GPS_SBF_H__
-#define __AP_GPS_SBF_H__
+#pragma once
 
 #include "AP_GPS.h"
+#include "GPS_Backend.h"
 
 #define SBF_SETUP_MSG "\nsso, Stream1, COM1, PVTGeodetic+DOP+ExtEventPVTGeodetic, msec100\n"
 
@@ -138,6 +137,3 @@ private:
 
     void log_ExtEventPVTGeodetic(const msg4007 &temp);
 };
-
-#endif // __AP_GPS_SBF_H__
-

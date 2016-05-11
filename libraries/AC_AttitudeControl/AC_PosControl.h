@@ -1,6 +1,5 @@
 /// -*- tab-width: 4; Mode: C++; c-basic-offset: 4; indent-tabs-mode: nil -*-
-#ifndef AC_POSCONTROL_H
-#define AC_POSCONTROL_H
+#pragma once
 
 #include <AP_Common/AP_Common.h>
 #include <AP_Param/AP_Param.h>
@@ -15,7 +14,7 @@
 
 
 // position controller default definitions
-#define POSCONTROL_THROTTLE_HOVER               500.0f  // default throttle required to maintain hover
+#define POSCONTROL_THROTTLE_HOVER               0.5f    // default throttle required to maintain hover
 #define POSCONTROL_ACCELERATION_MIN             50.0f   // minimum horizontal acceleration in cm/s/s - used for sanity checking acceleration in leash length calculation
 #define POSCONTROL_ACCEL_XY                     100.0f  // default horizontal acceleration in cm/s/s.  This is overwritten by waypoint and loiter controllers
 #define POSCONTROL_ACCEL_XY_MAX                 980.0f  // max horizontal acceleration in cm/s/s that the position velocity controller will ask from the lower accel controller
@@ -196,6 +195,10 @@ public:
     void set_jerk_xy(float jerk_cmsss) { _jerk_cmsss = jerk_cmsss; }
     void set_jerk_xy_to_default() { _jerk_cmsss = POSCONTROL_JERK_LIMIT_CMSSS; }
 
+    /// set_limit_accel_xy - mark that accel has been limited
+    ///     this prevents integrator buildup
+    void set_limit_accel_xy(void) { _limit.accel_xy = true; }
+    
     /// calc_leash_length - calculates the horizontal leash length given a maximum speed, acceleration
     ///     should be called whenever the speed, acceleration or position kP is modified
     void calc_leash_length_xy();
@@ -407,4 +410,3 @@ private:
     Vector2f    _accel_target_jerk_limited; // acceleration target jerk limited to 100deg/s/s
     LowPassFilterVector2f _accel_target_filter; // acceleration target filter
 };
-#endif	// AC_POSCONTROL_H

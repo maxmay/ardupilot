@@ -17,8 +17,7 @@
 /*
   GPS driver backend class
  */
-#ifndef __AP_GPS_BACKEND_H__
-#define __AP_GPS_BACKEND_H__
+#pragma once
 
 #include <GCS_MAVLink/GCS_MAVLink.h>
 #include "AP_GPS.h"
@@ -50,6 +49,8 @@ public:
 
     virtual void send_mavlink_gps2_rtk(mavlink_channel_t chan) { return ; }
 
+    virtual void broadcast_configuration_failure_reason(void) const { return ; }
+
 protected:
     AP_HAL::UARTDriver *port;           ///< UART we are attached to
     AP_GPS &gps;                        ///< access to frontend (for parameters)
@@ -70,5 +71,3 @@ protected:
     */
     void make_gps_time(uint32_t bcd_date, uint32_t bcd_milliseconds);
 };
-
-#endif // __AP_GPS_BACKEND_H__

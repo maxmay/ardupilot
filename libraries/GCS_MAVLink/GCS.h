@@ -3,9 +3,7 @@
 /// @file	GCS.h
 /// @brief	Interface definition for the various Ground Control System
 // protocols.
-
-#ifndef __GCS_H
-#define __GCS_H
+#pragma once
 
 #include <AP_HAL/AP_HAL.h>
 #include <AP_Common/AP_Common.h>
@@ -76,6 +74,7 @@ enum ap_message {
     MSG_VIBRATION,
     MSG_RPM,
     MSG_MISSION_ITEM_REACHED,
+    MSG_POSITION_TARGET_GLOBAL_INT,
     MSG_RETRY_DEFERRED // this must be last
 };
 
@@ -201,6 +200,8 @@ public:
     }
     
 private:
+    float       adjust_rate_for_stream_trigger(enum streams stream_num);
+
     void        handleMessage(mavlink_message_t * msg);
 
     /// The stream we are communicating over
@@ -308,7 +309,7 @@ private:
     // vehicle specific message send function
     bool try_send_message(enum ap_message id);
 
-    void handle_guided_request(AP_Mission::Mission_Command &cmd);
+    bool handle_guided_request(AP_Mission::Mission_Command &cmd);
     void handle_change_alt_request(AP_Mission::Mission_Command &cmd);
 
     void handle_log_request_list(mavlink_message_t *msg, DataFlash_Class &dataflash);
@@ -345,5 +346,3 @@ private:
     // return true if this channel has hardware flow control
     bool have_flow_control(void);
 };
-
-#endif // __GCS_H

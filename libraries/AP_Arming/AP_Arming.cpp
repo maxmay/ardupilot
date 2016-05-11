@@ -33,7 +33,7 @@ const AP_Param::GroupInfo AP_Arming::var_info[] = {
     // @Description: Arming disabled until some requirements are met. If 0, there are no requirements (arm immediately).  If 1, require rudder stick or GCS arming before arming motors and send THR_MIN PWM to throttle channel when disarmed.  If 2, require rudder stick or GCS arming and send 0 PWM to throttle channel when disarmed. See the ARMING_CHECK_* parameters to see what checks are done before arming. Note, if setting this parameter to 0 a reboot is required to arm the plane.  Also note, even with this parameter at 0, if ARMING_CHECK parameter is not also zero the plane may fail to arm throttle at boot due to a pre-arm check failure.
     // @Values: 0:Disabled,1:THR_MIN PWM when disarmed,2:0 PWM when disarmed
     // @User: Advanced
-    AP_GROUPINFO("REQUIRE",     0,      AP_Arming,  require,                 1),
+    AP_GROUPINFO_FLAGS("REQUIRE",     0,      AP_Arming,  require,                 1, AP_PARAM_NO_SHIFT),
 
     // @Param: CHECK
     // @DisplayName: Arm Checks to Peform (bitmask)
@@ -340,8 +340,9 @@ bool AP_Arming::gps_checks(bool report)
         if (first_unconfigured != AP_GPS::GPS_ALL_CONFIGURED) {
             if (report) {
                 GCS_MAVLINK::send_statustext_all(MAV_SEVERITY_CRITICAL,
-                                                 "PreArm: GPS %d has not been fully configured",
-                                                  first_unconfigured);
+                                                 "PreArm: GPS %d failing configuration checks",
+                                                  first_unconfigured + 1);
+                gps.broadcast_first_configuration_failure_reason();
             }
 #if CONFIG_HAL_BOARD != HAL_BOARD_SITL
             return false;

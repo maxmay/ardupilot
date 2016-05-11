@@ -23,6 +23,7 @@
 //   Note that this driver supports both the 1.6 and 1.9 protocol varients
 //
 
+#include "AP_GPS_MTK.h"
 #include "AP_GPS_MTK19.h"
 
 extern const AP_HAL::HAL& hal;
@@ -144,7 +145,7 @@ restart:
 			}
             state.location.alt      = _buffer.msg.altitude;
             state.ground_speed      = _buffer.msg.ground_speed*0.01f;
-            state.ground_course_cd  = wrap_360_cd(_buffer.msg.ground_course);
+            state.ground_course     = wrap_360(_buffer.msg.ground_course*0.01f);
             state.num_sats          = _buffer.msg.satellites;
             state.hdop              = _buffer.msg.hdop;
             

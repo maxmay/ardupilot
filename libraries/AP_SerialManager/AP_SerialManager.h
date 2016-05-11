@@ -1,6 +1,6 @@
 /// -*- tab-width: 4; Mode: C++; c-basic-offset: 4; indent-tabs-mode: nil -*-
 /*
-   Please contribute your ideas! See http://dev.ardupilot.com for details
+   Please contribute your ideas! See http://dev.ardupilot.org for details
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -20,16 +20,14 @@
   serial ports and provides helper functions so objects (like a gimbal) can
   find which serial port they should use
  */
-
-#ifndef _AP_SERIALMANAGER_
-#define _AP_SERIALMANAGER_
+#pragma once
 
 #include <AP_Math/AP_Math.h>
 #include <AP_Common/AP_Common.h>
 #include <AP_HAL/AP_HAL.h>
 #include <GCS_MAVLink/GCS_MAVLink.h>
 
-#define SERIALMANAGER_NUM_PORTS 5
+#define SERIALMANAGER_NUM_PORTS 6
 
  // console default baud rates and buffer sizes
 #ifdef HAL_SERIAL0_BAUD_DEFAULT
@@ -72,6 +70,7 @@ class AP_SerialManager {
 public:
 
     enum SerialProtocol {
+        SerialProtocol_None = -1,
         SerialProtocol_Console = 0,
         SerialProtocol_MAVLink = 1,
         SerialProtocol_MAVLink2 = 2,    // do not use - use MAVLink and provide instance of 1
@@ -131,5 +130,3 @@ private:
     // protocol_match - returns true if the protocols match
     bool protocol_match(enum SerialProtocol protocol1, enum SerialProtocol protocol2) const;
 };
-
-#endif // _AP_SERIALMANAGER_

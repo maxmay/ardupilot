@@ -27,7 +27,7 @@ bool Copter::heli_acro_init(bool ignore_checks)
 void Copter::heli_acro_run()
 {
     float target_roll, target_pitch, target_yaw;
-    int16_t pilot_throttle_scaled;
+    float pilot_throttle_scaled;
     
     // Tradheli should not reset roll, pitch, yaw targets when motors are not runup, because
     // we may be in autorotation flight.  These should be reset only when transitioning from disarmed
@@ -47,12 +47,9 @@ void Copter::heli_acro_run()
         }
     }   
 
-    // send RC inputs direct into motors library for use during manual passthrough for helicopter setup
-    heli_radio_passthrough();
-
     if (!motors.has_flybar()){
         // convert the input to the desired body frame rate
-        get_pilot_desired_angle_rates(channel_roll->control_in, channel_pitch->control_in, channel_yaw->control_in, target_roll, target_pitch, target_yaw);
+        get_pilot_desired_angle_rates(channel_roll->get_control_in(), channel_pitch->get_control_in(), channel_yaw->get_control_in(), target_roll, target_pitch, target_yaw);
 
         if (motors.supports_yaw_passthrough()) {
             // if the tail on a flybar heli has an external gyro then
@@ -81,7 +78,7 @@ void Copter::heli_acro_run()
             // if there is no external gyro then run the usual
             // ACRO_YAW_P gain on the input control, including
             // deadzone
-            yaw_in = get_pilot_desired_yaw_rate(channel_yaw->control_in);
+            yaw_in = get_pilot_desired_yaw_rate(channel_yaw->get_control_in());
         }
 
         // run attitude controller
@@ -89,7 +86,7 @@ void Copter::heli_acro_run()
     }
 
     // get pilot's desired throttle
-    pilot_throttle_scaled = input_manager.get_pilot_desired_collective(channel_throttle->control_in);
+    pilot_throttle_scaled = input_manager.get_pilot_desired_collective(channel_throttle->get_control_in());
 
     // output pilot's throttle without angle boost
     attitude_control.set_throttle_out(pilot_throttle_scaled, false, g.throttle_filt);

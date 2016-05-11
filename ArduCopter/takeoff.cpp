@@ -38,9 +38,11 @@ bool Copter::do_user_takeoff(float takeoff_alt_cm, bool must_navigate)
 
         switch(control_mode) {
             case GUIDED:
-                set_auto_armed(true);
-                guided_takeoff_start(takeoff_alt_cm);
-                return true;
+                if (guided_takeoff_start(takeoff_alt_cm)) {
+                    set_auto_armed(true);
+                    return true;
+                }
+                return false;
             case LOITER:
             case POSHOLD:
             case ALT_HOLD:
@@ -48,6 +50,8 @@ bool Copter::do_user_takeoff(float takeoff_alt_cm, bool must_navigate)
                 set_auto_armed(true);
                 takeoff_timer_start(takeoff_alt_cm);
                 return true;
+            default:
+                return false;
         }
     }
     return false;

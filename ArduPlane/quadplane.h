@@ -8,12 +8,32 @@
 #include <AC_WPNav/AC_WPNav.h>
 
 /*
+  frame types for quadplane build. Most case be set with
+  parameters. Those that can't are listed here and chosen with a build
+  time FRAME_CONFIG parameter
+ */
+#define MULTICOPTER_FRAME 1
+#define TRI_FRAME 2
+
+#ifndef FRAME_CONFIG
+# define FRAME_CONFIG MULTICOPTER_FRAME
+#endif
+
+#if FRAME_CONFIG == TRI_FRAME
+#define AP_MOTORS_CLASS AP_MotorsTri
+#else
+#define AP_MOTORS_CLASS AP_MotorsMulticopter
+#endif
+
+/*
   QuadPlane specific functionality
  */
 class QuadPlane
 {
 public:
     friend class Plane;
+    friend class AP_Tuning_Plane;
+    
     QuadPlane(AP_AHRS_NavEKF &_ahrs);
 
     // var_info for holding Parameter information
@@ -23,6 +43,12 @@ public:
     void control_auto(const Location &loc);
     bool init_mode(void);
     bool setup(void);
+    void setup_defaults(void);
+
+    void vtol_position_controller(void);
+    void setup_target_position(void);
+    void takeoff_controller(void);
+    void waypoint_controller(void);
     
     // update transition handling
     void update(void);
@@ -40,12 +66,12 @@ public:
         return available() && assisted_flight;
     }
     
-    bool handle_do_vtol_transition(const mavlink_command_long_t &packet);
+    bool handle_do_vtol_transition(enum MAV_VTOL_STATE state);
 
     bool do_vtol_takeoff(const AP_Mission::Mission_Command& cmd);
     bool do_vtol_land(const AP_Mission::Mission_Command& cmd);
     bool verify_vtol_takeoff(const AP_Mission::Mission_Command &cmd);
-    bool verify_vtol_land(const AP_Mission::Mission_Command &cmd);
+    bool verify_vtol_land(void);
     bool in_vtol_auto(void);
     bool in_vtol_mode(void);
 
@@ -54,31 +80,50 @@ public:
 
     // return current throttle as a percentate
     uint8_t throttle_percentage(void) const {
-        return last_throttle * 0.1f;
+        return last_throttle * 100;
     }
+
+    // return desired forward throttle percentage
+    int8_t forward_throttle_pct(void);        
+    float get_weathervane_yaw_rate_cds(void);
+
+    // see if we are flying from vtol point of view
+    bool is_flying_vtol(void);
     
+    struct PACKED log_QControl_Tuning {
+        LOG_PACKET_HEADER;
+        uint64_t time_us;
+        float    angle_boost;
+        float    throttle_out;
+        float    desired_alt;
+        float    inav_alt;
+        int32_t  baro_alt;
+        int16_t  desired_climb_rate;
+        int16_t  climb_rate;
+        float    dvx;
+        float    dvy;
+        float    dax;
+        float    day;
+    };
+        
 private:
     AP_AHRS_NavEKF &ahrs;
     AP_Vehicle::MultiCopter aparm;
-    AC_PID        pid_rate_roll {0.25, 0.1, 0.004,  2000, 20, 0.02};
-    AC_PID        pid_rate_pitch{0.25, 0.1, 0.004,  2000, 20, 0.02};
-    AC_PID        pid_rate_yaw  {0.15, 0.1, 0.004,  2000, 20, 0.02};
-    AC_P          p_stabilize_roll{4.5};
-    AC_P          p_stabilize_pitch{4.5};
-    AC_P          p_stabilize_yaw{4.5};
 
     AP_InertialNav_NavEKF inertial_nav{ahrs};
 
-    AC_P                    p_pos_xy{1};
+    AC_P                    p_pos_xy{0.7};
     AC_P                    p_alt_hold{1};
     AC_P                    p_vel_z{5};
-    AC_PID                  pid_accel_z{0.3, 1, 0, 800, 20, 0.02};
-    AC_PI_2D                pi_vel_xy{1.0, 0.5, 1000, 5, 0.02};
+    AC_PID                  pid_accel_z{0.3, 1, 0, 800, 10, 0.02};
+    AC_PI_2D                pi_vel_xy{0.7, 0.35, 1000, 5, 0.02};
 
+#if FRAME_CONFIG == MULTICOPTER_FRAME
     AP_Int8 frame_class;
+#endif
     AP_Int8 frame_type;
     
-    AP_MotorsMulticopter *motors;
+    AP_MOTORS_CLASS *motors;
     AC_AttitudeControl_Multi *attitude_control;
     AC_PosControl *pos_control;
     AC_WPNav *wp_nav;
@@ -122,15 +167,24 @@ private:
     void control_loiter(void);
     void check_land_complete(void);
 
+    void init_qrtl(void);
+    void control_qrtl(void);
+    
     float assist_climb_rate_cms(void);
 
     // calculate desired yaw rate for assistance
     float desired_auto_yaw_rate_cds(void);
 
     bool should_relax(void);
-
+    void motors_output(void);
+    void Log_Write_QControl_Tuning();
+    float landing_descent_rate_cms(float height_above_ground);
+    
     // setup correct aux channels for frame class
     void setup_default_channels(uint8_t num_motors);
+
+    void guided_start(void);
+    void guided_update(void);
     
     AP_Int16 transition_time_ms;
 
@@ -140,6 +194,7 @@ private:
     AP_Int16 thr_min_pwm;
     AP_Int16 thr_max_pwm;
     AP_Int16 throttle_mid;
+    AP_Int16 throttle_min;
 
     // speed below which quad assistance is given
     AP_Float assist_speed;
@@ -150,11 +205,34 @@ private:
     // landing speed in cm/s
     AP_Int16 land_speed_cms;
 
+    // QRTL start altitude, meters
+    AP_Int16 qrtl_alt;
+    
     // alt to switch to QLAND_FINAL
     AP_Float land_final_alt;
     
     AP_Int8 enable;
     AP_Int8 transition_pitch_max;
+
+    // control if a VTOL RTL will be used
+    AP_Int8 rtl_mode;
+
+    // control if a VTOL GUIDED will be used
+    AP_Int8 guided_mode;
+    
+    struct {
+        AP_Float gain;
+        float integrator;
+        uint32_t lastt_ms;
+        int8_t last_pct;
+    } vel_forward;
+
+    struct {
+        AP_Float gain;
+        AP_Float min_roll;
+        uint32_t last_pilot_input_ms;
+        float last_output;
+    } weathervane;
     
     bool initialised;
     
@@ -187,20 +265,28 @@ private:
     // time we last set the loiter target
     uint32_t last_loiter_ms;
 
-    enum {
-        QLAND_POSITION,
-        QLAND_DESCEND,
-        QLAND_FINAL,
-        QLAND_COMPLETE
-    } land_state;
-    int32_t land_yaw_cd;
-    float land_wp_proportion;
+    enum position_control_state {
+        QPOS_POSITION1,
+        QPOS_POSITION2,
+        QPOS_LAND_DESCEND,
+        QPOS_LAND_FINAL,
+        QPOS_LAND_COMPLETE
+    };
+    struct {
+        enum position_control_state state;
+        float speed_scale;
+        Vector2f target_velocity;
+        float max_speed;
+        Vector3f target;
+        bool slow_descent:1;
+    } poscontrol;
 
     enum frame_class {
         FRAME_CLASS_QUAD=0,
         FRAME_CLASS_HEXA=1,
         FRAME_CLASS_OCTA=2,
         FRAME_CLASS_OCTAQUAD=3,
+        FRAME_CLASS_Y6=4,
     };
 
     struct {
@@ -210,12 +296,28 @@ private:
         uint8_t seq = 0;              // motor sequence number of motor being tested
         uint8_t throttle_type = 0;    // motor throttle type (0=throttle percentage, 1=PWM, 2=pilot throttle channel pass-through)
         uint16_t throttle_value = 0;  // throttle to be sent to motor, value depends upon it's type
+        uint8_t motor_count;          // number of motors to cycle
     } motor_test;
 
+    // tiltrotor control variables
+    struct {
+        AP_Int16 tilt_mask;
+        AP_Int16 max_rate_dps;
+        AP_Int8  max_angle_deg;
+        float current_tilt;
+        float current_throttle;
+        bool motors_active:1;
+    } tilt;
+
+    void tiltrotor_slew(float tilt);
+    void tiltrotor_update(void);
+    void tilt_compensate(float *thrust, uint8_t num_motors);
+    
 public:
     void motor_test_output();
     uint8_t mavlink_motor_test_start(mavlink_channel_t chan, uint8_t motor_seq, uint8_t throttle_type,
-                                     uint16_t throttle_value, float timeout_sec);
+                                     uint16_t throttle_value, float timeout_sec,
+                                     uint8_t motor_count);
 private:
     void motor_test_stop();
 };

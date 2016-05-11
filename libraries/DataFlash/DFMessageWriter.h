@@ -1,5 +1,4 @@
-#ifndef DF_LOGSTARTUP_H
-#define DF_LOGSTARTUP_H
+#pragma once
 
 #include "DataFlash_Backend.h"
 
@@ -105,13 +104,8 @@ private:
     AP_Param::ParamToken token;
     AP_Param *ap;
     enum ap_var_type type;
-    uint16_t num_format_types;
-    const struct LogStructure *_structures;
 
 
     DFMessageWriter_WriteSysInfo _writesysinfo;
     DFMessageWriter_WriteEntireMission _writeentiremission;
 };
-
-#endif
-

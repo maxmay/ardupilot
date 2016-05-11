@@ -1,15 +1,15 @@
 # PX4 build is via external build system
 
 ifneq ($(PX4_ROOT),)
-$(error PX4_ROOT found in config.mk - Please see http://dev.ardupilot.com/wiki/git-submodules/)
+$(error PX4_ROOT found in config.mk - Please see http://dev.ardupilot.org/wiki/git-submodules/)
 endif
 
 ifneq ($(NUTTX_SRC),)
-$(error NUTTX_SRC found in config.mk - Please see http://dev.ardupilot.com/wiki/git-submodules/)
+$(error NUTTX_SRC found in config.mk - Please see http://dev.ardupilot.org/wiki/git-submodules/)
 endif
 
 ifneq ($(UAVCAN_DIR),)
-$(error UAVCAN_DIR found in config.mk - Please see http://dev.ardupilot.com/wiki/git-submodules/)
+$(error UAVCAN_DIR found in config.mk - Please see http://dev.ardupilot.org/wiki/git-submodules/)
 endif
 
 # these can be overridden in developer.mk
@@ -33,8 +33,8 @@ ifneq ($(wildcard $(SKETCHBOOK)/../uavcan),)
 $(warning *** You have an old uavcan tree - see http://dev.ardupilot.com/wiki/git-submodules/)
 endif
 
-NUTTX_GIT_VERSION := $(shell cd $(NUTTX_SRC) && git rev-parse HEAD | cut -c1-8)
-PX4_GIT_VERSION   := $(shell cd $(PX4_ROOT) && git rev-parse HEAD | cut -c1-8)
+NUTTX_GIT_VERSION ?= $(shell cd $(NUTTX_SRC) && git rev-parse HEAD | cut -c1-8)
+PX4_GIT_VERSION   ?= $(shell cd $(PX4_ROOT) && git rev-parse HEAD | cut -c1-8)
 
 EXTRAFLAGS += -DNUTTX_GIT_VERSION="\"$(NUTTX_GIT_VERSION)\""
 EXTRAFLAGS += -DPX4_GIT_VERSION="\"$(PX4_GIT_VERSION)\""
@@ -42,7 +42,8 @@ EXTRAFLAGS += -DUAVCAN=1
 
 # Add missing parts from libc and libstdc++
 EXTRAFLAGS += -DHAVE_STD_NULLPTR_T=0
-EXTRAFLAGS += -I$(SKETCHBOOK)/libraries/AP_Common/missing
+
+EXTRAFLAGS += -I$(BUILDROOT)/libraries/GCS_MAVLink/include/mavlink
 
 # we have different config files for V1 and V2
 PX4_V1_CONFIG_FILE=$(MK_DIR)/PX4/config_px4fmu-v1_APM.mk
@@ -51,7 +52,7 @@ PX4_V4_CONFIG_FILE=$(MK_DIR)/PX4/config_px4fmu-v4_APM.mk
 
 SKETCHFLAGS=$(SKETCHLIBINCLUDES) -DARDUPILOT_BUILD -DTESTS_MATHLIB_DISABLE -DCONFIG_HAL_BOARD=HAL_BOARD_PX4 -DSKETCHNAME="\\\"$(SKETCH)\\\"" -DSKETCH_MAIN=ArduPilot_main -DAPM_BUILD_DIRECTORY=APM_BUILD_$(SKETCH)
 
-WARNFLAGS = -Wall -Wextra -Wlogical-op -Werror -Wno-redundant-decls -Wno-psabi -Wno-packed -Wno-error=double-promotion -Wno-error=unused-variable -Wno-error=reorder -Wno-error=float-equal -Wno-error=pmf-conversions -Wno-error=missing-declarations -Wno-error=unused-function
+WARNFLAGS = -Wall -Wextra -Wlogical-op -Werror -Wno-unknown-pragmas -Wno-redundant-decls -Wno-psabi -Wno-packed -Wno-error=double-promotion -Wno-error=unused-variable -Wno-error=reorder -Wno-error=float-equal -Wno-error=pmf-conversions -Wno-error=missing-declarations -Wno-error=unused-function
 OPTFLAGS = -fsingle-precision-constant
 
 # avoid PX4 submodules
@@ -109,6 +110,7 @@ px4-v4: $(BUILDROOT)/make.flags CHECK_MODULES $(MAVLINK_HEADERS) $(PX4_ROOT)/Arc
 	$(PX4_MAKE) px4fmu-v4_APM
 	$(v) arm-none-eabi-size $(PX4_ROOT)/Build/px4fmu-v4_APM.build/firmware.elf
 	$(v) cp $(PX4_ROOT)/Images/px4fmu-v4_APM.px4 $(SKETCH)-v4.px4
+	$(v) mkdir -p $(MK_DIR)/PX4/ROMFS/bootloader/
 	$(v) cp $(SKETCHBOOK)/mk/PX4/bootloader/px4fmuv4_bl.bin $(MK_DIR)/PX4/ROMFS/bootloader/fmu_bl.bin
 	$(v) $(SKETCHBOOK)/Tools/scripts/add_git_hashes.py $(HASHADDER_FLAGS) "$(SKETCH)-v4.px4" "$(SKETCH)-v4.px4"
 	$(v) echo "PX4 $(SKETCH) Firmware is in $(SKETCH)-v4.px4"
@@ -147,7 +149,7 @@ px4-archives-clean:
 	$(v) /bin/rm -rf $(PX4_ROOT)/Archives
 
 px4-io-v1: $(PX4_ROOT)/Archives/px4io-v1.export
-	$(v)+ $(MAKE) -C $(PX4_ROOT) -f $(PX4_ROOT)/Makefile.make px4io-v1_default
+	$(v)+ $(MAKE) -C $(PX4_ROOT) -f $(PX4_ROOT)/Makefile.make px4io-v1_default EXTRADEFINES="-DARDUPILOT_BUILD"
 	$(v) cp $(PX4_ROOT)/Images/px4io-v1_default.bin px4io-v1.bin
 	$(v) cp $(PX4_ROOT)/Build/px4io-v1_default.build/firmware.elf px4io-v1.elf
 	$(v) mkdir -p $(MK_DIR)/PX4/ROMFS/px4io/
@@ -158,7 +160,7 @@ px4-io-v1: $(PX4_ROOT)/Archives/px4io-v1.export
 
 
 px4-io-v2: $(PX4_ROOT)/Archives/px4io-v2.export
-	$(v)+ $(MAKE) -C $(PX4_ROOT) -f $(PX4_ROOT)/Makefile.make px4io-v2_default
+	$(v)+ $(MAKE) -C $(PX4_ROOT) -f $(PX4_ROOT)/Makefile.make px4io-v2_default EXTRADEFINES="-DARDUPILOT_BUILD"
 	$(v) cp $(PX4_ROOT)/Images/px4io-v2_default.bin px4io-v2.bin
 	$(v) cp $(PX4_ROOT)/Build/px4io-v2_default.build/firmware.elf px4io-v2.elf
 	$(v) mkdir -p $(MK_DIR)/PX4/ROMFS/px4io/

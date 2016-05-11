@@ -26,7 +26,7 @@ void Copter::heli_stabilize_run()
 {
     float target_roll, target_pitch;
     float target_yaw_rate;
-    int16_t pilot_throttle_scaled;
+    float pilot_throttle_scaled;
 
     // Tradheli should not reset roll, pitch, yaw targets when motors are not runup, because
     // we may be in autorotation flight.  These should be reset only when transitioning from disarmed
@@ -46,21 +46,18 @@ void Copter::heli_stabilize_run()
         }
     }
 
-    // send RC inputs direct into motors library for use during manual passthrough for helicopter setup
-    heli_radio_passthrough();
-
     // apply SIMPLE mode transform to pilot inputs
     update_simple_mode();
 
     // convert pilot input to lean angles
     // To-Do: convert get_pilot_desired_lean_angles to return angles as floats
-    get_pilot_desired_lean_angles(channel_roll->control_in, channel_pitch->control_in, target_roll, target_pitch, aparm.angle_max);
+    get_pilot_desired_lean_angles(channel_roll->get_control_in(), channel_pitch->get_control_in(), target_roll, target_pitch, aparm.angle_max);
 
     // get pilot's desired yaw rate
-    target_yaw_rate = get_pilot_desired_yaw_rate(channel_yaw->control_in);
+    target_yaw_rate = get_pilot_desired_yaw_rate(channel_yaw->get_control_in());
 
     // get pilot's desired throttle
-    pilot_throttle_scaled = input_manager.get_pilot_desired_collective(channel_throttle->control_in);
+    pilot_throttle_scaled = input_manager.get_pilot_desired_collective(channel_throttle->get_control_in());
 
     // call attitude controller
     attitude_control.input_euler_angle_roll_pitch_euler_rate_yaw_smooth(target_roll, target_pitch, target_yaw_rate, get_smoothing_gain());

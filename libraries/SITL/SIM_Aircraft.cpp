@@ -80,18 +80,22 @@ bool Aircraft::parse_home(const char *home_str, Location &loc, float &yaw_degree
     }
     char *lat_s = strtok_r(s, ",", &saveptr);
     if (!lat_s) {
+        free(s);
         return false;
     }
     char *lon_s = strtok_r(NULL, ",", &saveptr);
     if (!lon_s) {
+        free(s);
         return false;
     }
     char *alt_s = strtok_r(NULL, ",", &saveptr);
     if (!alt_s) {
+        free(s);
         return false;
     }
     char *yaw_s = strtok_r(NULL, ",", &saveptr);
     if (!yaw_s) {
+        free(s);
         return false;
     }
 
@@ -136,18 +140,6 @@ void Aircraft::update_position(void)
     if (use_time_sync) {
         sync_frame_time();
     }
-}
-
-/*
-   rotate to the given yaw
-*/
-void Aircraft::set_yaw_degrees(float yaw_degrees)
-{
-    float roll, pitch, yaw;
-    dcm.to_euler(&roll, &pitch, &yaw);
-
-    yaw = radians(yaw_degrees);
-    dcm.from_euler(roll, pitch, yaw);
 }
 
 /* advance time by deltat in seconds */
@@ -287,11 +279,13 @@ void Aircraft::fill_fdm(struct sitl_fdm &fdm) const
     fdm.rollDeg  = degrees(r);
     fdm.pitchDeg = degrees(p);
     fdm.yawDeg   = degrees(y);
-    fdm.airspeed = airspeed;
+    fdm.airspeed = airspeed_pitot;
     fdm.battery_voltage = battery_voltage;
     fdm.battery_current = battery_current;
     fdm.rpm1 = rpm1;
     fdm.rpm2 = rpm2;
+    fdm.rcin_chan_count = rcin_chan_count;
+    memcpy(fdm.rcin, rcin, rcin_chan_count*sizeof(float));
 }
 
 uint64_t Aircraft::get_wall_time_us() const
@@ -328,10 +322,14 @@ void Aircraft::set_speedup(float speedup)
 void Aircraft::update_dynamics(const Vector3f &rot_accel)
 {
     float delta_time = frame_time_us * 1.0e-6f;
-
+    
     // update rotational rates in body frame
     gyro += rot_accel * delta_time;
 
+    gyro.x = constrain_float(gyro.x, -radians(2000), radians(2000));
+    gyro.y = constrain_float(gyro.y, -radians(2000), radians(2000));
+    gyro.z = constrain_float(gyro.z, -radians(2000), radians(2000));
+    
     // update attitude
     dcm.rotate(gyro * delta_time);
     dcm.normalize();
@@ -356,9 +354,18 @@ void Aircraft::update_dynamics(const Vector3f &rot_accel)
     Vector3f old_position = position;
     position += velocity_ef * delta_time;
 
-    // assume zero wind for now
-    airspeed = velocity_ef.length();
+    // velocity relative to air mass, in earth frame
+    velocity_air_ef = velocity_ef - wind_ef;
+    
+    // velocity relative to airmass in body frame
+    velocity_air_bf = dcm.transposed() * velocity_air_ef;
+    
+    // airspeed 
+    airspeed = velocity_air_ef.length();
 
+    // airspeed as seen by a fwd pitot tube (limited to 120m/s)
+    airspeed_pitot = constrain_float(velocity_air_bf * Vector3f(1, 0, 0), 0, 120);
+    
     // constrain height to the ground
     if (on_ground(position)) {
         if (!on_ground(old_position) && AP_HAL::millis() - last_ground_contact_ms > 1000) {
@@ -367,6 +374,15 @@ void Aircraft::update_dynamics(const Vector3f &rot_accel)
         }
         position.z = -(ground_level + frame_height - home.alt*0.01f);
     }
+}
+
+/*
+  update wind vector
+*/
+void Aircraft::update_wind(const struct sitl_input &input)
+{
+    // wind vector in earth frame
+    wind_ef = Vector3f(cosf(radians(input.wind.direction)), sinf(radians(input.wind.direction)), 0) * input.wind.speed;
 }
     
 } // namespace SITL

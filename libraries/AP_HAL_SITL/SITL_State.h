@@ -1,6 +1,4 @@
-
-#ifndef __AP_HAL_SITL_STATE_H__
-#define __AP_HAL_SITL_STATE_H__
+#pragma once
 
 #include <AP_HAL/AP_HAL.h>
 
@@ -19,7 +17,7 @@
 
 #include <AP_Baro/AP_Baro.h>
 #include <AP_InertialSensor/AP_InertialSensor.h>
-#include <AP_Compass/Compass.h>
+#include <AP_Compass/AP_Compass.h>
 #include <AP_OpticalFlow/AP_OpticalFlow.h>
 #include <AP_Terrain/AP_Terrain.h>
 #include <SITL/SITL.h>
@@ -63,12 +61,13 @@ public:
     const char *get_client_address(void) const { return _client_address; }
 
     // paths for UART devices
-    const char *_uart_path[5] {
+    const char *_uart_path[6] {
         "tcp:0:wait",
         "GPS1",
         "tcp:2",
         "tcp:3",
-        "GPS2"
+        "GPS2",
+        "tcp:4",
     };
     
 private:
@@ -219,5 +218,3 @@ private:
 };
 
 #endif // CONFIG_HAL_BOARD == HAL_BOARD_SITL
-#endif // __AP_HAL_SITL_STATE_H__
-

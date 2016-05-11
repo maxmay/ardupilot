@@ -1,6 +1,7 @@
 // -*- tab-width: 4; Mode: C++; c-basic-offset: 4; indent-tabs-mode: nil -*-
 
 #include "Plane.h"
+#include "version.h"
 
 /*****************************************************************************
 *   The init_ardupilot function processes everything we need for an in - air restart
@@ -144,14 +145,10 @@ void Plane::init_ardupilot()
     usb_connected = true;
     check_usb_mux();
 
-    // setup serial port for telem1
-    gcs[1].setup_uart(serial_manager, AP_SerialManager::SerialProtocol_MAVLink, 0);
-
-    // setup serial port for telem2
-    gcs[2].setup_uart(serial_manager, AP_SerialManager::SerialProtocol_MAVLink, 1);
-
-    // setup serial port for fourth telemetry port (not used by default)
-    gcs[3].setup_uart(serial_manager, AP_SerialManager::SerialProtocol_MAVLink, 2);
+    // setup all other telem slots with  serial ports
+    for (uint8_t i = 1; i < MAVLINK_COMM_NUM_BUFFERS; i++) {
+        gcs[i].setup_uart(serial_manager, AP_SerialManager::SerialProtocol_MAVLink, (i - 1));
+    }
 
     // setup frsky
 #if FRSKY_TELEM_ENABLED == ENABLED
@@ -232,9 +229,9 @@ void Plane::init_ardupilot()
 
     init_capabilities();
 
-    startup_ground();
-
     quadplane.setup();
+
+    startup_ground();
 
     // don't initialise rc output until after quadplane is setup as
     // that can change initial values of channels
@@ -430,7 +427,11 @@ void Plane::set_mode(enum FlightMode mode)
 
     case AUTO:
         auto_throttle_mode = true;
-        auto_state.vtol_mode = false;
+        if (quadplane.available() && quadplane.enable == 2) {
+            auto_state.vtol_mode = true;
+        } else {
+            auto_state.vtol_mode = false;
+        }
         next_WP_loc = prev_WP_loc = current_loc;
         // start or resume the mission, based on MIS_AUTORESET
         mission.start_or_resume();
@@ -439,7 +440,7 @@ void Plane::set_mode(enum FlightMode mode)
     case RTL:
         auto_throttle_mode = true;
         prev_WP_loc = current_loc;
-        do_RTL();
+        do_RTL(get_RTL_altitude());
         break;
 
     case LOITER:
@@ -462,6 +463,7 @@ void Plane::set_mode(enum FlightMode mode)
     case QHOVER:
     case QLOITER:
     case QLAND:
+    case QRTL:
         if (!quadplane.init_mode()) {
             control_mode = previous_mode;
         } else {
@@ -507,6 +509,7 @@ bool Plane::mavlink_set_mode(uint8_t mode)
     case QHOVER:
     case QLOITER:
     case QLAND:
+    case QRTL:
         set_mode((enum FlightMode)mode);
         return true;
     }
@@ -636,10 +639,12 @@ void Plane::update_notify()
 
 void Plane::resetPerfData(void) 
 {
-    mainLoop_count                  = 0;
-    G_Dt_max                        = 0;
-    G_Dt_min                        = 0;
-    perf_mon_timer                  = millis();
+    perf.mainLoop_count = 0;
+    perf.G_Dt_max       = 0;
+    perf.G_Dt_min       = 0;
+    perf.num_long       = 0;
+    perf.start_ms       = millis();
+    perf.last_log_dropped = DataFlash.num_dropped();
 }
 
 
@@ -709,6 +714,9 @@ void Plane::print_flight_mode(AP_HAL::BetterStream *port, uint8_t mode)
     case QLAND:
         port->print("QLand");
         break;
+    case QRTL:
+        port->print("QRTL");
+        break;
     default:
         port->printf("Mode(%u)", (unsigned)mode);
         break;
@@ -730,7 +738,7 @@ void Plane::servo_write(uint8_t ch, uint16_t pwm)
 #if HIL_SUPPORT
     if (g.hil_mode==1 && !g.hil_servos) {
         if (ch < 8) {
-            RC_Channel::rc_channel(ch)->radio_out = pwm;
+            RC_Channel::rc_channel(ch)->set_radio_out(pwm);
         }
         return;
     }
@@ -748,7 +756,7 @@ bool Plane::should_log(uint32_t mask)
     if (!(mask & g.log_bitmask) || in_mavlink_delay) {
         return false;
     }
-    bool ret = hal.util->get_soft_armed() || (g.log_bitmask & MASK_LOG_WHEN_DISARMED) != 0;
+    bool ret = hal.util->get_soft_armed() || DataFlash.log_while_disarmed();
     if (ret && !DataFlash.logging_started() && !in_log_download) {
         // we have to set in_mavlink_delay to prevent logging while
         // writing headers
@@ -838,5 +846,8 @@ bool Plane::disarm_motors(void)
     //only log if disarming was successful
     change_arm_state();
 
+    // reload target airspeed which could have been modified by a mission
+    plane.g.airspeed_cruise_cm.load();
+    
     return true;
 }

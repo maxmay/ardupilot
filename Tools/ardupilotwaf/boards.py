@@ -17,6 +17,9 @@ class BoardMeta(type):
         if cls.abstract:
             return
 
+        if not hasattr(cls, 'toolchain'):
+            cls.toolchain = 'native'
+
         board_name = getattr(cls, 'name', name)
         if board_name in _board_classes:
             raise Exception('board named %s already exists' % board_name)
@@ -26,6 +29,9 @@ class Board:
     abstract = True
 
     def configure(self, cfg):
+        cfg.env.TOOLCHAIN = self.toolchain
+        cfg.load('toolchain')
+
         env = waflib.ConfigSet.ConfigSet()
         self.configure_env(cfg, env)
 
@@ -41,18 +47,21 @@ class Board:
                     keys.sort()
                 val = ['%s=%s' % (vk, val[vk]) for vk in keys]
 
-            if k in cfg.env and isinstance(cfg.env, list):
+            if k in cfg.env and isinstance(cfg.env[k], list):
                 cfg.env.prepend_value(k, val)
             else:
                 cfg.env[k] = val
 
-        cfg.load('toolchain')
-        cfg.load('compiler_cxx compiler_c')
+        cfg.load('cxx_checks')
 
     def configure_env(self, cfg, env):
         # Use a dictionary instead of the convetional list for definitions to
         # make easy to override them. Convert back to list before consumption.
         env.DEFINES = {}
+
+        env.prepend_value('INCLUDES', [
+            cfg.srcnode.find_dir('libraries/AP_Common/missing').abspath()
+        ])
 
         env.CFLAGS += [
             '-ffunction-sections',
@@ -69,7 +78,25 @@ class Board:
             '-Wno-missing-field-initializers',
             '-Wno-unused-parameter',
             '-Wno-redundant-decls',
+            '-Wno-unknown-pragmas',
         ]
+
+        if 'clang' in cfg.env.COMPILER_CC:
+            env.CFLAGS += [
+                '-fcolor-diagnostics',
+
+                '-Wno-gnu-designator',
+                '-Wno-inconsistent-missing-override',
+                '-Wno-mismatched-tags',
+                '-Wno-gnu-variable-sized-type-not-at-end',
+                '-Wno-c++11-narrowing'
+            ]
+
+        if cfg.env.DEBUG:
+            env.CFLAGS += [
+                '-g',
+                '-O0',
+            ]
 
         env.CXXFLAGS += [
             '-std=gnu++11',
@@ -90,20 +117,41 @@ class Board:
             '-Wno-missing-field-initializers',
             '-Wno-reorder',
             '-Wno-redundant-decls',
+            '-Wno-unknown-pragmas',
             '-Werror=format-security',
             '-Werror=array-bounds',
-            '-Werror=unused-but-set-variable',
             '-Werror=uninitialized',
             '-Werror=init-self',
             '-Wfatal-errors',
         ]
+
+        if 'clang++' in cfg.env.COMPILER_CXX:
+            env.CXXFLAGS += [
+                '-fcolor-diagnostics',
+
+                '-Wno-gnu-designator',
+                '-Wno-inconsistent-missing-override',
+                '-Wno-mismatched-tags',
+                '-Wno-gnu-variable-sized-type-not-at-end',
+                '-Wno-c++11-narrowing'
+            ]
+        else:
+            env.CXXFLAFS += [
+                '-Werror=unused-but-set-variable'
+            ]
+
+        if cfg.env.DEBUG:
+            env.CXXFLAGS += [
+                '-g',
+                '-O0',
+            ]
 
         env.LINKFLAGS += [
             '-Wl,--gc-sections',
         ]
 
     def build(self, bld):
-        pass
+        bld.ap_version_append_str('GIT_VERSION', bld.git_head_hash(short=True))
 
 Board = BoardMeta('Board', Board.__bases__, dict(Board.__dict__))
 
@@ -129,9 +177,12 @@ class sitl(Board):
             CONFIG_HAL_BOARD = 'HAL_BOARD_SITL',
             CONFIG_HAL_BOARD_SUBTYPE = 'HAL_BOARD_SUBTYPE_NONE',
         )
-        env.CXXFLAGS += [
-            '-O3',
-        ]
+
+        if not cfg.env.DEBUG:
+            env.CXXFLAGS += [
+                '-O3',
+            ]
+
         env.LIB += [
             'm',
         ]
@@ -141,6 +192,11 @@ class sitl(Board):
             'SITL',
         ]
 
+        if sys.platform == 'cygwin':
+            env.LIB += [
+                'winmm',
+            ]
+
 class linux(Board):
     def configure_env(self, cfg, env):
         super(linux, self).configure_env(cfg, env)
@@ -149,9 +205,12 @@ class linux(Board):
             CONFIG_HAL_BOARD = 'HAL_BOARD_LINUX',
             CONFIG_HAL_BOARD_SUBTYPE = 'HAL_BOARD_SUBTYPE_LINUX_NONE',
         )
-        env.CXXFLAGS += [
-            '-O3',
-        ]
+
+        if not cfg.env.DEBUG:
+            env.CXXFLAGS += [
+                '-O3',
+            ]
+
         env.LIB += [
             'm',
             'rt',
@@ -171,107 +230,124 @@ class minlure(linux):
 
 
 class erleboard(linux):
+    toolchain = 'arm-linux-gnueabihf'
+
     def configure_env(self, cfg, env):
         super(erleboard, self).configure_env(cfg, env)
 
-        env.TOOLCHAIN = 'arm-linux-gnueabihf'
         env.DEFINES.update(
             CONFIG_HAL_BOARD_SUBTYPE = 'HAL_BOARD_SUBTYPE_LINUX_ERLEBOARD',
         )
 
 class navio(linux):
+    toolchain = 'arm-linux-gnueabihf'
+
     def configure_env(self, cfg, env):
         super(navio, self).configure_env(cfg, env)
 
-        env.TOOLCHAIN = 'arm-linux-gnueabihf'
         env.DEFINES.update(
             CONFIG_HAL_BOARD_SUBTYPE = 'HAL_BOARD_SUBTYPE_LINUX_NAVIO',
         )
 
 class navio2(linux):
+    toolchain = 'arm-linux-gnueabihf'
+
     def configure_env(self, cfg, env):
         super(navio2, self).configure_env(cfg, env)
 
-        env.TOOLCHAIN = 'arm-linux-gnueabihf'
         env.DEFINES.update(
             CONFIG_HAL_BOARD_SUBTYPE = 'HAL_BOARD_SUBTYPE_LINUX_NAVIO2',
         )
 
 class zynq(linux):
+    toolchain = 'arm-xilinx-linux-gnueabi'
+
     def configure_env(self, cfg, env):
         super(zynq, self).configure_env(cfg, env)
 
-        env.TOOLCHAIN = 'arm-xilinx-linux-gnueabi'
         env.DEFINES.update(
             CONFIG_HAL_BOARD_SUBTYPE = 'HAL_BOARD_SUBTYPE_LINUX_ZYNQ',
         )
 
 class bbbmini(linux):
+    toolchain = 'arm-linux-gnueabihf'
+
     def configure_env(self, cfg, env):
         super(bbbmini, self).configure_env(cfg, env)
 
-        env.TOOLCHAIN = 'arm-linux-gnueabihf'
         env.DEFINES.update(
             CONFIG_HAL_BOARD_SUBTYPE = 'HAL_BOARD_SUBTYPE_LINUX_BBBMINI',
         )
 
 class pxf(linux):
+    toolchain = 'arm-linux-gnueabihf'
+
     def configure_env(self, cfg, env):
         super(pxf, self).configure_env(cfg, env)
 
-        env.TOOLCHAIN = 'arm-linux-gnueabihf'
         env.DEFINES.update(
             CONFIG_HAL_BOARD_SUBTYPE = 'HAL_BOARD_SUBTYPE_LINUX_PXF',
         )
 
 class bebop(linux):
+    toolchain = 'arm-linux-gnueabihf'
+
     def configure_env(self, cfg, env):
         super(bebop, self).configure_env(cfg, env)
 
-        env.TOOLCHAIN = 'arm-linux-gnueabihf'
+        cfg.check_cfg(package='libiio', mandatory=False, global_define=True,
+                args = ['--libs', '--cflags'])
+
+        env.LIB += cfg.env.LIB_LIBIIO
+
         env.DEFINES.update(
             CONFIG_HAL_BOARD_SUBTYPE = 'HAL_BOARD_SUBTYPE_LINUX_BEBOP',
         )
         env.STATIC_LINKING = True
 
 class raspilot(linux):
+    toolchain = 'arm-linux-gnueabihf'
+
     def configure_env(self, cfg, env):
         super(raspilot, self).configure_env(cfg, env)
 
-        env.TOOLCHAIN = 'arm-linux-gnueabihf'
         env.DEFINES.update(
             CONFIG_HAL_BOARD_SUBTYPE = 'HAL_BOARD_SUBTYPE_LINUX_RASPILOT',
         )
 
 class erlebrain2(linux):
+    toolchain = 'arm-linux-gnueabihf'
+
     def configure_env(self, cfg, env):
         super(erlebrain2, self).configure_env(cfg, env)
 
-        env.TOOLCHAIN = 'arm-linux-gnueabihf'
         env.DEFINES.update(
             CONFIG_HAL_BOARD_SUBTYPE = 'HAL_BOARD_SUBTYPE_LINUX_ERLEBRAIN2',
         )
 
 class bhat(linux):
+    toolchain = 'arm-linux-gnueabihf'
+
     def configure_env(self, cfg, env):
         super(bhat, self).configure_env(cfg, env)
 
-        env.TOOLCHAIN = 'arm-linux-gnueabihf'
         env.DEFINES.update(
             CONFIG_HAL_BOARD_SUBTYPE = 'HAL_BOARD_SUBTYPE_LINUX_BH',
         )
 
 class pxfmini(linux):
+    toolchain = 'arm-linux-gnueabihf'
+
     def configure_env(self, cfg, env):
         super(pxfmini, self).configure_env(cfg, env)
 
-        env.TOOLCHAIN = 'arm-linux-gnueabihf'
         env.DEFINES.update(
             CONFIG_HAL_BOARD_SUBTYPE = 'HAL_BOARD_SUBTYPE_LINUX_PXFMINI',
         )
 
 class px4(Board):
     abstract = True
+    toolchain = 'arm-none-eabi'
 
     def __init__(self):
         self.version = None
@@ -287,14 +363,10 @@ class px4(Board):
     def configure_env(self, cfg, env):
         super(px4, self).configure_env(cfg, env)
 
-        env.TOOLCHAIN = 'arm-none-eabi'
         env.DEFINES.update(
             CONFIG_HAL_BOARD = 'HAL_BOARD_PX4',
             HAVE_STD_NULLPTR_T = 0,
         )
-        env.prepend_value('INCLUDES', [
-            cfg.srcnode.find_dir('libraries/AP_Common/missing').abspath()
-        ])
         env.CXXFLAGS += [
             '-Wlogical-op',
             '-Wframe-larger-than=1300',
@@ -321,6 +393,8 @@ class px4(Board):
 
     def build(self, bld):
         super(px4, self).build(bld)
+        bld.ap_version_append_str('NUTTX_GIT_VERSION', bld.git_submodule_head_hash('PX4NuttX', short=True))
+        bld.ap_version_append_str('PX4_GIT_VERSION', bld.git_submodule_head_hash('PX4Firmware', short=True))
         bld.load('px4')
 
 class px4_v1(px4):

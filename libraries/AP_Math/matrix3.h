@@ -36,9 +36,7 @@
 // Matrix3ul	3x3 matrix of unsigned longs
 // Matrix3f		3x3 matrix of signed floats
 //
-
-#ifndef MATRIX3_H
-#define MATRIX3_H
+#pragma once
 
 #include "vector3.h"
 
@@ -232,6 +230,11 @@ public:
     // only use X, Y elements from rotation vector
     void        rotateXYinv(const Vector3<T> &g);
 
+    // create rotation matrix for rotation about the vector v by angle theta
+    // See: https://en.wikipedia.org/wiki/Rotation_matrix#General_rotations
+    // "Rotation matrix from axis and angle"
+    void        from_axis_angle(const Vector3<T> &v, float theta);
+    
     // normalize a rotation matrix
     void        normalize(void);
 };
@@ -242,5 +245,3 @@ typedef Matrix3<int32_t>                Matrix3l;
 typedef Matrix3<uint32_t>               Matrix3ul;
 typedef Matrix3<float>                  Matrix3f;
 typedef Matrix3<double>                 Matrix3d;
-
-#endif // MATRIX3_H

@@ -24,6 +24,7 @@ const AP_Param::Info Plane::var_info[] = {
     // @DisplayName: Software Type
     // @Description: This is used by the ground station to recognise the software type (eg ArduPlane vs ArduCopter)
     // @User: Advanced
+    // @ReadOnly: True
     GSCALAR(software_type,          "SYSID_SW_TYPE",  Parameters::k_software_type),
 
     // @Param: SYSID_THISMAV
@@ -130,8 +131,8 @@ const AP_Param::Info Plane::var_info[] = {
 
     // @Param: AUTO_FBW_STEER
     // @DisplayName: Use FBWA steering in AUTO
-    // @Description: When enabled this option gives FBWA navigation and steering in AUTO mode. This can be used to allow manual stabilised piloting with waypoint logic for triggering payloads. With this enabled the pilot has the same control over the plane as in FBWA mode, and the normal AUTO navigation is completely disabled. This option is not recommended for normal use.
-    // @Values: 0:Disabled,1:Enabled
+    // @Description: When enabled this option gives FBWA navigation and steering in AUTO mode. This can be used to allow manual stabilised piloting with waypoint logic for triggering payloads. With this enabled the pilot has the same control over the plane as in FBWA mode, and the normal AUTO navigation is completely disabled. THIS OPTION IS NOT RECOMMENDED FOR NORMAL USE.
+    // @Values: 0:Disabled,42:Enabled
     // @User: Advanced
     GSCALAR(auto_fbw_steer,          "AUTO_FBW_STEER",   0),
 
@@ -197,6 +198,15 @@ const AP_Param::Info Plane::var_info[] = {
     // @Increment: 1
     // @User: User
     GSCALAR(takeoff_throttle_slewrate, "TKOFF_THR_SLEW",  0),
+
+    // @Param: TKOFF_PLIM_SEC
+    // @DisplayName: Takeoff pitch limit reduction
+    // @Description: This parameter reduces the pitch minimum limit of an auto-takeoff just a few seconds before it reaches the target altitude. This reduces overshoot by allowing the flight controller to start leveling off a few seconds before reaching the target height. When set to zero, the mission pitch min is enforced all the way to and through the target altitude, otherwise the pitch min slowly reduces to zero in the final segment. This is the pitch_min, not the demand. The flight controller should still be commanding to gain altitude to finish the takeoff but with this param it is not forcing it higher than it wants to be.
+    // @Units: seconds
+    // @Range: 0 10
+    // @Increment: 0.5
+    // @User: Advanced
+    GSCALAR(takeoff_pitch_limit_reduction_sec, "TKOFF_PLIM_SEC",  2),
 
     // @Param: LAND_THR_SLEW
     // @DisplayName: Landing throttle slew rate
@@ -843,9 +853,9 @@ const AP_Param::Info Plane::var_info[] = {
 
     // @Param: LOG_BITMASK
     // @DisplayName: Log bitmask
-    // @Description: Bitmap of what log types to enable in dataflash. This values is made up of the sum of each of the log types you want to be saved on dataflash. On a PX4 or Pixhawk the large storage size of a microSD card means it is usually best just to enable all log types by setting this to 65535. On APM2 the smaller 4 MByte dataflash means you need to be more selective in your logging or you may run out of log space while flying (in which case it will wrap and overwrite the start of the log). The individual bits are ATTITUDE_FAST=1, ATTITUDE_MEDIUM=2, GPS=4, PerformanceMonitoring=8, ControlTuning=16, NavigationTuning=32, Mode=64, IMU=128, Commands=256, Battery=512, Compass=1024, TECS=2048, Camera=4096, RCandServo=8192, Sonar=16384, Arming=32768, LogWhenDisarmed=65536, FullLogsArmedOnly=65535, FullLogsWhenDisarmed=131071
+    // @Description: Bitmap of what log types to enable in dataflash. This values is made up of the sum of each of the log types you want to be saved on dataflash. On a PX4 or Pixhawk the large storage size of a microSD card means it is usually best just to enable all log types by setting this to 65535. On APM2 the smaller 4 MByte dataflash means you need to be more selective in your logging or you may run out of log space while flying (in which case it will wrap and overwrite the start of the log). The individual bits are ATTITUDE_FAST=1, ATTITUDE_MEDIUM=2, GPS=4, PerformanceMonitoring=8, ControlTuning=16, NavigationTuning=32, Mode=64, IMU=128, Commands=256, Battery=512, Compass=1024, TECS=2048, Camera=4096, RCandServo=8192, Sonar=16384, Arming=32768, FullLogs=65535
     // @Values: 0:Disabled,5190:APM2-Default,65535:PX4/Pixhawk-Default
-    // @Bitmask: 0:ATTITUDE_FAST,1:ATTITUDE_MED,2:GPS,3:PM,4:CTUN,5:NTUN,6:MODE,7:IMU,8:CMD,9:CURRENT,10:COMPASS,11:TECS,12:CAMERA,13:RC,14:SONAR,15:ARM/DISARM,16:WHEN_DISARMED,19:IMU_RAW
+    // @Bitmask: 0:ATTITUDE_FAST,1:ATTITUDE_MED,2:GPS,3:PM,4:CTUN,5:NTUN,6:MODE,7:IMU,8:CMD,9:CURRENT,10:COMPASS,11:TECS,12:CAMERA,13:RC,14:SONAR,15:ARM/DISARM,19:IMU_RAW
     // @User: Advanced
     GSCALAR(log_bitmask,            "LOG_BITMASK",    DEFAULT_LOG_BITMASK),
 
@@ -1104,6 +1114,16 @@ const AP_Param::Info Plane::var_info[] = {
     // @Group: Q_
     // @Path: quadplane.cpp
     GOBJECT(quadplane,           "Q_", QuadPlane),
+
+    // @Group: TUNE_
+    // @Path: tuning.cpp,../libraries/AP_Tuning/AP_Tuning.cpp
+    GOBJECT(tuning,           "TUNE_", AP_Tuning_Plane),
+    
+    // @Group: Q_A_
+    // @Path: ../libraries/AC_AttitudeControl/AC_AttitudeControl_Multi.cpp
+    { AP_PARAM_GROUP, "Q_A_", Parameters::k_param_q_attitude_control,
+      (const void *)&plane.quadplane.attitude_control,
+      {group_info : AC_AttitudeControl_Multi::var_info}, AP_PARAM_FLAG_POINTER },
     
     // RC channel
     //-----------
@@ -1163,6 +1183,14 @@ const AP_Param::Info Plane::var_info[] = {
     // @Path: ../libraries/RC_Channel/RC_Channel.cpp,../libraries/RC_Channel/RC_Channel_aux.cpp
     GGROUP(rc_14,                    "RC14_", RC_Channel_aux),
 
+    // @Group: RC15_
+    // @Path: ../libraries/RC_Channel/RC_Channel.cpp,../libraries/RC_Channel/RC_Channel_aux.cpp
+    GGROUP(rc_15,                    "RC15_", RC_Channel_aux),
+
+    // @Group: RC16_
+    // @Path: ../libraries/RC_Channel/RC_Channel.cpp,../libraries/RC_Channel/RC_Channel_aux.cpp
+    GGROUP(rc_16,                    "RC16_", RC_Channel_aux),
+    
     // @Group: RLL2SRV_
     // @Path: ../libraries/APM_Control/AP_RollController.cpp
 	GOBJECT(rollController,         "RLL2SRV_",   AP_RollController),
@@ -1182,7 +1210,7 @@ const AP_Param::Info Plane::var_info[] = {
 	// variables not in the g class which contain EEPROM saved variables
 
     // @Group: COMPASS_
-    // @Path: ../libraries/AP_Compass/Compass.cpp
+    // @Path: ../libraries/AP_Compass/AP_Compass.cpp
     GOBJECT(compass,                "COMPASS_",     Compass),
 
     // @Group: SCHED_
@@ -1335,6 +1363,23 @@ const AP_Param::ConversionInfo conversion_table[] = {
     { Parameters::k_param_serial0_baud,       0,      AP_PARAM_INT16, "SERIAL0_BAUD" },
     { Parameters::k_param_serial1_baud,       0,      AP_PARAM_INT16, "SERIAL1_BAUD" },
     { Parameters::k_param_serial2_baud,       0,      AP_PARAM_INT16, "SERIAL2_BAUD" },
+
+    // these are needed to cope with the change to treat nested index 0 as index 63
+    { Parameters::k_param_quadplane,          3,      AP_PARAM_FLOAT, "Q_RT_RLL_P" },
+    { Parameters::k_param_quadplane,          4,      AP_PARAM_FLOAT, "Q_RT_PIT_P" },
+    { Parameters::k_param_quadplane,          5,      AP_PARAM_FLOAT, "Q_RT_YAW_P" },
+
+    { Parameters::k_param_quadplane,          6,      AP_PARAM_FLOAT, "Q_STB_R_P" },
+    { Parameters::k_param_quadplane,          7,      AP_PARAM_FLOAT, "Q_STB_P_P" },
+    { Parameters::k_param_quadplane,          8,      AP_PARAM_FLOAT, "Q_STB_Y_P" },
+
+    { Parameters::k_param_quadplane,         12,      AP_PARAM_FLOAT, "Q_PZ_P" },
+    { Parameters::k_param_quadplane,         13,      AP_PARAM_FLOAT, "Q_PXY_P" },
+    { Parameters::k_param_quadplane,         14,      AP_PARAM_FLOAT, "Q_VXY_P" },
+    { Parameters::k_param_quadplane,         15,      AP_PARAM_FLOAT, "Q_VZ_P" },
+    { Parameters::k_param_quadplane,         16,      AP_PARAM_FLOAT, "Q_AZ_P" },
+    
+    
 };
 
 void Plane::load_parameters(void)
@@ -1359,5 +1404,11 @@ void Plane::load_parameters(void)
     // Load all auto-loaded EEPROM variables
     AP_Param::load_all();
     AP_Param::convert_old_parameters(&conversion_table[0], ARRAY_SIZE(conversion_table));
+
+    if (quadplane.enable) {
+        // quadplanes needs a higher loop rate
+        AP_Param::set_default_by_name("SCHED_LOOP_RATE", 300);
+    }
+    
     cliSerial->printf("load_all took %uus\n", (unsigned)(micros() - before));
 }

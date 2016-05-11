@@ -13,17 +13,12 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
-/* 
+/*
    main Rover class, containing all vehicle specific state
 */
+#pragma once
 
-#ifndef _ROVER_H_
-#define _ROVER_H_
-
-#define THISFIRMWARE "ArduRover v2.51-beta"
-#define FIRMWARE_VERSION 2,51,0,FIRMWARE_VERSION_TYPE_BETA
-
-#include <math.h>
+#include <cmath>
 #include <stdarg.h>
 
 // Libraries
@@ -130,7 +125,7 @@ private:
     RC_Channel *channel_throttle;
     RC_Channel *channel_learn;
 
-    DataFlash_Class DataFlash{FIRMWARE_STRING};
+    DataFlash_Class DataFlash;
 
     bool in_log_download;
 
@@ -564,5 +559,3 @@ extern Rover rover;
 
 using AP_HAL::millis;
 using AP_HAL::micros;
-
-#endif // _ROVER_H_

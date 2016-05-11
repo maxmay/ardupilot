@@ -19,12 +19,12 @@
 //	Code by Michael Smith, Jordi Munoz and Jose Julio, DIYDrones.com
 //
 //  UBlox Lea6H protocol: http://www.u-blox.com/images/downloads/Product_Docs/u-blox6_ReceiverDescriptionProtocolSpec_%28GPS.G6-SW-10018%29.pdf
-
-#ifndef __AP_GPS_UBLOX_H__
-#define __AP_GPS_UBLOX_H__
+#pragma once
 
 #include <AP_HAL/AP_HAL.h>
+
 #include "AP_GPS.h"
+#include "GPS_Backend.h"
 
 /*
  *  try to put a UBlox into binary mode. This is in two parts. 
@@ -100,6 +100,8 @@ public:
 
     static bool _detect(struct UBLOX_detect_state &state, uint8_t data);
 
+    void inject_data(uint8_t *data, uint8_t len);
+    
     bool is_configured(void) {
         if (!gps._auto_config) {
             return true;
@@ -108,6 +110,7 @@ public:
         }
     }
 
+    void broadcast_configuration_failure_reason(void) const override;
 private:
     // u-blox UBX protocol essentials
     struct PACKED ubx_header {
@@ -537,5 +540,3 @@ private:
         return (uint8_t)(ubx_msg + (state.instance * UBX_MSG_TYPES));
     }
 };
-
-#endif // __AP_GPS_UBLOX_H__

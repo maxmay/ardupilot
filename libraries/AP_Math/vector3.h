@@ -46,18 +46,16 @@
 *           or if the matrix (A) * b = 0
 *
 ****************************************/
+#pragma once
 
-#ifndef VECTOR3_H
-#define VECTOR3_H
-
-#include <math.h>
+#include <cmath>
 #include <float.h>
 #include <string.h>
-
-
 #if MATH_CHECK_INDEXES
 #include <assert.h>
 #endif
+
+#include "rotations.h"
 
 template <typename T>
 class Matrix3;
@@ -219,5 +217,3 @@ typedef Vector3<int32_t>                Vector3l;
 typedef Vector3<uint32_t>               Vector3ul;
 typedef Vector3<float>                  Vector3f;
 typedef Vector3<double>                 Vector3d;
-
-#endif // VECTOR3_H

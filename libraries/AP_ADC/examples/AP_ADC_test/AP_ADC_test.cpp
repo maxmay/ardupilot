@@ -4,7 +4,7 @@
  *  Code by Jordi Muñoz and Jose Julio. DIYDrones.com
  */
 
-#include <math.h>
+#include <cmath>
 
 #include <AP_Common/AP_Common.h>
 #include <AP_Math/AP_Math.h>
@@ -58,7 +58,7 @@ static void show_timing()
         count++;
     } while ((AP_HAL::millis() - start_time) < 5000);
 
-    hal.console->printf("timing: mint=%lu maxt=%lu avg=%lu\n", mint, maxt, totalt/count);
+    hal.console->printf("timing: mint=%u maxt=%u avg=%u\n", mint, maxt, totalt/count);
 }
 
 static void show_data()

@@ -17,9 +17,7 @@
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-
-#ifndef AP_NavEKF
-#define AP_NavEKF
+#pragma once
 
 #include <AP_Math/AP_Math.h>
 #include <AP_InertialSensor/AP_InertialSensor.h>
@@ -131,7 +129,7 @@ public:
 
     // Return estimated magnetometer offsets
     // Return true if magnetometer offsets are valid
-    bool getMagOffsets(Vector3f &magOffsets) const;
+    bool getMagOffsets(uint8_t mag_idx, Vector3f &magOffsets) const;
 
     // Return the last calculated latitude, longitude and height in WGS-84
     // If a calculated location isn't available, return a raw GPS measurement
@@ -300,5 +298,3 @@ private:
     AP_Int8 _gpsCheck;              // Bitmask controlling which preflight GPS checks are bypassed
 
 };
-
-#endif // AP_NavEKF

@@ -31,9 +31,6 @@
 
 extern const AP_HAL::HAL& hal;
 
-#define FLIGHTAXIS_SERVER_IP "192.168.2.48"
-#define FLIGHTAXIS_SERVER_PORT 18083
-
 namespace SITL {
 
 // the asprintf() calls are not worth checking for SITL
@@ -46,6 +43,10 @@ FlightAxis::FlightAxis(const char *home_str, const char *frame_str) :
     rate_hz = 250 / target_speedup;
     heli_demix = strstr(frame_str, "helidemix") != NULL;
     rev4_servos = strstr(frame_str, "rev4") != NULL;
+    const char *colon = strchr(frame_str, ':');
+    if (colon) {
+        controller_ip = colon+1;
+    }
 }
 
 /*
@@ -65,8 +66,11 @@ void FlightAxis::parse_reply(const char *reply)
         }
         p += strlen(keytable[i].key) + 1;
         keytable[i].ref = atof(p);
-        // this assumes key order
-        reply = p;
+        // this assumes key order and allows us to decode arrays
+        p = strchr(p, '>');
+        if (p != nullptr) {
+            reply = p;
+        }
     }
 }
 
@@ -87,7 +91,7 @@ char *FlightAxis::soap_request(const char *action, const char *fmt, ...)
     
     // open SOAP socket to FlightAxis
     SocketAPM sock(false);
-    if (!sock.connect(FLIGHTAXIS_SERVER_IP, FLIGHTAXIS_SERVER_PORT)) {
+    if (!sock.connect(controller_ip, controller_port)) {
         free(req1);
         return nullptr;
     }
@@ -139,6 +143,8 @@ Connection: Keep-Alive
         if (ret2 <= 0) {
             return nullptr;
         }
+        // nul terminate
+        reply[ret+ret2] = 0;
         ret += ret2;
     }
     return strdup(reply);
@@ -149,7 +155,7 @@ Connection: Keep-Alive
 void FlightAxis::exchange_data(const struct sitl_input &input)
 {
     if (!controller_started) {
-        printf("Starting controller\n");
+        printf("Starting controller at %s\n", controller_ip);
         // call a restore first. This allows us to connect after the aircraft is changed in RealFlight
         char *reply = soap_request("RestoreOriginalControllerDevice", R"(<?xml version='1.0' encoding='UTF-8'?>
 <soap:Envelope xmlns:soap='http://schemas.xmlsoap.org/soap/envelope/' xmlns:xsd='http://www.w3.org/2001/XMLSchema' xmlns:xsi='http://www.w3.org/2001/XMLSchema-instance'>
@@ -287,11 +293,20 @@ void FlightAxis::update(const struct sitl_input &input)
     accel_body.z = constrain_float(accel_body.z, -16, 16);
 
     airspeed = state.m_airspeed_MPS;
+    airspeed_pitot = state.m_airspeed_MPS;
 
     battery_voltage = state.m_batteryVoltage_VOLTS;
     battery_current = state.m_batteryCurrentDraw_AMPS;
     rpm1 = state.m_propRPM;
     rpm2 = state.m_heliMainRotorRPM;
+
+    /*
+      the interlink interface supports 8 input channels
+     */
+    rcin_chan_count = 8;
+    for (uint8_t i=0; i<rcin_chan_count; i++) {
+        rcin[i] = state.rcin[i];
+    }
     
     update_position();
     time_now_us = (state.m_currentPhysicsTime_SEC - initial_time_s)*1.0e6;

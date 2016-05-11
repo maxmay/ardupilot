@@ -58,10 +58,24 @@ bool Plane::verify_land()
 #else
     bool rangefinder_in_range = false;
 #endif
-    if (height <= g.land_flare_alt ||
-        (aparm.land_flare_sec > 0 && height <= auto_state.sink_rate * aparm.land_flare_sec) ||
-        (!rangefinder_in_range && location_passed_point(current_loc, prev_WP_loc, next_WP_loc)) ||
-        (fabsf(auto_state.sink_rate) < 0.2f && !is_flying())) {
+
+    // flare check:
+    // 1) below flare alt/sec requires approach stage check because if sec/alt are set too
+    //    large, and we're on a hard turn to line up for approach, we'll prematurely flare by
+    //    skipping approach phase and the extreme roll limits will make it hard to line up with runway
+    // 2) passed land point and don't have an accurate AGL
+    // 3) probably crashed (ensures motor gets turned off)
+
+    bool on_approach_stage = (flight_stage == AP_SpdHgtControl::FLIGHT_LAND_APPROACH ||
+                              flight_stage == AP_SpdHgtControl::FLIGHT_LAND_PREFLARE);
+    bool below_flare_alt = (height <= g.land_flare_alt);
+    bool below_flare_sec = (aparm.land_flare_sec > 0 && height <= auto_state.sink_rate * aparm.land_flare_sec);
+    bool probably_crashed = (fabsf(auto_state.sink_rate) < 0.2f && !is_flying());
+
+    if ((on_approach_stage && below_flare_alt) ||
+        (on_approach_stage && below_flare_sec && (auto_state.wp_proportion > 0.5)) ||
+        (!rangefinder_in_range && auto_state.wp_proportion >= 1) ||
+        probably_crashed) {
 
         if (!auto_state.land_complete) {
             auto_state.post_landing_stats = true;
@@ -281,6 +295,11 @@ bool Plane::restart_landing_sequence()
     } else {
         gcs_send_text_fmt(MAV_SEVERITY_WARNING, "Unable to restart landing sequence");
         success =  false;
+    }
+
+    if (success) {
+        // exit landing stages if we're no longer executing NAV_LAND
+        update_flight_stage();
     }
     return success;
 }

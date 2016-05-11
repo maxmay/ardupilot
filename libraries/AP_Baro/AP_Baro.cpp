@@ -45,6 +45,8 @@ const AP_Param::GroupInfo AP_Baro::var_info[] = {
     // @Description: calibrated ground pressure in Pascals
     // @Units: pascals
     // @Increment: 1
+    // @ReadOnly: True
+    // @Volatile: True
     AP_GROUPINFO("ABS_PRESS", 2, AP_Baro, sensors[0].ground_pressure, 0),
 
     // @Param: TEMP
@@ -52,6 +54,8 @@ const AP_Param::GroupInfo AP_Baro::var_info[] = {
     // @Description: calibrated ground temperature in degrees Celsius
     // @Units: degrees celsius
     // @Increment: 1
+    // @ReadOnly: True
+    // @Volatile: True
     AP_GROUPINFO("TEMP", 3, AP_Baro, sensors[0].ground_temperature, 0),
 
     // index 4 reserved for old AP_Int8 version in legacy FRAM
@@ -242,6 +246,9 @@ float AP_Baro::get_air_density_ratio(void)
 // note that this relies on read() being called regularly to get new data
 float AP_Baro::get_climb_rate(void)
 {
+    if (_hil.have_alt) {
+        return _hil.climb_rate;
+    }
     // we use a 7 point derivative filter on the climb rate. This seems
     // to produce somewhat reasonable results on real hardware
     return _climb_rate_filter.slope() * 1.0e3f;
@@ -373,6 +380,12 @@ void AP_Baro::update(void)
             if (sensors[i].alt_ok) {
                 sensors[i].altitude = altitude + _alt_offset_active;
             }
+        }
+        if (_hil.have_alt) {
+            sensors[0].altitude = _hil.altitude;
+        }
+        if (_hil.have_last_update) {
+            sensors[0].last_update_ms = _hil.last_update_ms;
         }
     }
 

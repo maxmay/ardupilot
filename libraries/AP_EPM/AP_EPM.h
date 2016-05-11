@@ -6,14 +6,12 @@
  *  Created on: DEC 06, 2013
  *      Author: Andreas Jochum
  *
- *      Set-up Wiki: http://copter.ardupilot.com/wiki/common-electro-permanent-magnet-gripper/
+ *      Set-up Wiki: http://copter.ardupilot.org/wiki/common-electro-permanent-magnet-gripper/
  */
 
 /// @file	AP_EPM.h
 /// @brief	AP_EPM control class
-
-#ifndef __AP_EPM_h__
-#define __AP_EPM_h__
+#pragma once
 
 #include <AP_Math/AP_Math.h>
 #include <AP_Common/AP_Common.h>
@@ -71,5 +69,3 @@ private:
     // internal variables
     uint32_t    _last_grab_or_release;
 };
-
-#endif /* _AP_EPM_H_ */

@@ -41,6 +41,7 @@ public:
     }
 
     struct state {
+        double rcin[8];
         double m_airspeed_MPS;
         double m_altitudeASL_MTR;
         double m_altitudeAGL_MTR;
@@ -94,6 +95,14 @@ public:
         const char *key;
         double &ref;
     } keytable[num_keys] = {
+        { "item", state.rcin[0] },
+        { "item", state.rcin[1] },
+        { "item", state.rcin[2] },
+        { "item", state.rcin[3] },
+        { "item", state.rcin[4] },
+        { "item", state.rcin[5] },
+        { "item", state.rcin[6] },
+        { "item", state.rcin[7] },
         { "m-airspeed-MPS", state.m_airspeed_MPS },
         { "m-altitudeASL-MTR", state.m_altitudeASL_MTR },
         { "m-altitudeAGL-MTR", state.m_altitudeAGL_MTR },
@@ -155,6 +164,9 @@ private:
     uint64_t activation_frame_counter = 0;
     double last_frame_count_s = 0;
     Vector3f position_offset;
+
+    const char *controller_ip = "127.0.0.1";
+    uint16_t controller_port = 18083;
 };
 
 

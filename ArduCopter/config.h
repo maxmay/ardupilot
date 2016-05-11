@@ -1,7 +1,7 @@
 // -*- tab-width: 4; Mode: C++; c-basic-offset: 4; indent-tabs-mode: nil -*-
 //
-#ifndef __ARDUCOPTER_CONFIG_H__
-#define __ARDUCOPTER_CONFIG_H__
+#pragma once
+
 //////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////
 //
@@ -93,24 +93,6 @@
 #if FRAME_CONFIG == HELI_FRAME
   # define RC_FAST_SPEED                        125
   # define WP_YAW_BEHAVIOR_DEFAULT              WP_YAW_BEHAVIOR_LOOK_AHEAD
-  # define RATE_ROLL_P                          0.02
-  # define RATE_ROLL_I                          0.5
-  # define RATE_ROLL_D                          0.001
-  # define RATE_ROLL_IMAX                       4500
-  # define RATE_ROLL_FF                         0.05
-  # define RATE_ROLL_FILT_HZ                    20.0f
-  # define RATE_PITCH_P                         0.02
-  # define RATE_PITCH_I                         0.5
-  # define RATE_PITCH_D                         0.001
-  # define RATE_PITCH_IMAX                      4500
-  # define RATE_PITCH_FF                        0.05
-  # define RATE_PITCH_FILT_HZ                   20.0f
-  # define RATE_YAW_P                           0.15
-  # define RATE_YAW_I                           0.100
-  # define RATE_YAW_D                           0.003
-  # define RATE_YAW_IMAX                        4500
-  # define RATE_YAW_FF                          0.02
-  # define RATE_YAW_FILT_HZ                     20.0f
   # define THR_MIN_DEFAULT                      0
   # define AUTOTUNE_ENABLED                     DISABLED
 #endif
@@ -213,11 +195,6 @@
  # define GNDEFFECT_COMPENSATION          DISABLED
 #endif
 
-// possible values for FS_GCS parameter
-#define FS_GCS_DISABLED                     0
-#define FS_GCS_ENABLED_ALWAYS_RTL           1
-#define FS_GCS_ENABLED_CONTINUE_MISSION     2
-
 // Radio failsafe while using RC_override
 #ifndef FS_RADIO_RC_OVERRIDE_TIMEOUT_MS
  # define FS_RADIO_RC_OVERRIDE_TIMEOUT_MS  1000    // RC Radio failsafe triggers after 1 second while using RC_override from ground station
@@ -228,8 +205,9 @@
  #define FS_RADIO_TIMEOUT_MS            500     // RC Radio Failsafe triggers after 500 miliseconds with No RC Input
 #endif
 
-#ifndef FS_CLOSE_TO_HOME_CM
- # define FS_CLOSE_TO_HOME_CM               500 // if vehicle within 5m of home, vehicle will LAND instead of RTL during some failsafes
+// missing terrain data failsafe
+#ifndef FS_TERRAIN_TIMEOUT_MS
+ #define FS_TERRAIN_TIMEOUT_MS          5000     // 5 seconds of missing terrain data will trigger failsafe (RTL)
 #endif
 
 #ifndef PREARM_DISPLAY_PERIOD
@@ -461,19 +439,6 @@
  #define ACRO_EXPO_DEFAULT          0.3f
 #endif
 
-// Stabilize (angle controller) gains
-#ifndef STABILIZE_ROLL_P
- # define STABILIZE_ROLL_P          4.5f
-#endif
-
-#ifndef STABILIZE_PITCH_P
- # define STABILIZE_PITCH_P         4.5f
-#endif
-
-#ifndef  STABILIZE_YAW_P
- # define STABILIZE_YAW_P           4.5f
-#endif
-
 // RTL Mode
 #ifndef RTL_ALT_FINAL
  # define RTL_ALT_FINAL             0       // the altitude the vehicle will move to as the final stage of Returning to Launch.  Set to zero to land.
@@ -536,59 +501,6 @@
 #endif
 #ifndef ANGLE_RATE_MAX
  # define ANGLE_RATE_MAX            18000           // default maximum rotation rate in roll/pitch axis requested by angle controller used in stabilize, loiter, rtl, auto flight modes
-#endif
-
-//////////////////////////////////////////////////////////////////////////////
-// Rate controller gains
-//
-
-#ifndef RATE_ROLL_P
- # define RATE_ROLL_P        		0.150f
-#endif
-#ifndef RATE_ROLL_I
- # define RATE_ROLL_I        		0.100f
-#endif
-#ifndef RATE_ROLL_D
- # define RATE_ROLL_D        		0.004f
-#endif
-#ifndef RATE_ROLL_IMAX
- # define RATE_ROLL_IMAX         	2000
-#endif
-#ifndef RATE_ROLL_FILT_HZ
- # define RATE_ROLL_FILT_HZ         20.0f
-#endif
-
-#ifndef RATE_PITCH_P
- # define RATE_PITCH_P       		0.150f
-#endif
-#ifndef RATE_PITCH_I
- # define RATE_PITCH_I       		0.100f
-#endif
-#ifndef RATE_PITCH_D
- # define RATE_PITCH_D       		0.004f
-#endif
-#ifndef RATE_PITCH_IMAX
- # define RATE_PITCH_IMAX        	2000
-#endif
-#ifndef RATE_PITCH_FILT_HZ
- # define RATE_PITCH_FILT_HZ        20.0f
-#endif
-
-
-#ifndef RATE_YAW_P
- # define RATE_YAW_P              	0.200f
-#endif
-#ifndef RATE_YAW_I
- # define RATE_YAW_I              	0.020f
-#endif
-#ifndef RATE_YAW_D
- # define RATE_YAW_D              	0.000f
-#endif
-#ifndef RATE_YAW_IMAX
- # define RATE_YAW_IMAX            	1000
-#endif
-#ifndef RATE_YAW_FILT_HZ
- # define RATE_YAW_FILT_HZ          5.0f
 #endif
 
 //////////////////////////////////////////////////////////////////////////////
@@ -759,15 +671,3 @@
 #ifndef FRSKY_TELEM_ENABLED
   #  define FRSKY_TELEM_ENABLED          ENABLED
 #endif
-
-/*
-  build a firmware version string.
-  GIT_VERSION comes from Makefile builds
-*/
-#ifndef GIT_VERSION
-#define FIRMWARE_STRING THISFIRMWARE
-#else
-#define FIRMWARE_STRING THISFIRMWARE " (" GIT_VERSION ")"
-#endif
-
-#endif // __ARDUCOPTER_CONFIG_H__
